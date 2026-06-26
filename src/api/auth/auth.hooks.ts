@@ -28,7 +28,20 @@ export function useLogin() {
     mutationFn: (data: LoginCredentials) => authApi.login(data),
     onSuccess: (data) => {
       auth.setTokens(data.accessToken, data.refreshToken);
-      setUser(data.user);
+      setUser({
+        id: data.user.id,
+        email: data.user.email,
+        firstName: data.user.firstName,
+        lastName: data.user.lastName,
+        avatar: data.user.avatar,
+        companyId: data.user.companyId,
+        role: data.user.role.name,
+        permissions: data.user.permissions.map((p) => ({
+          module: p.module,
+          action: p.action as any,
+          scope: p.scope as any,
+        })),
+      });
       qc.invalidateQueries({ queryKey: authKeys.all });
     },
   });

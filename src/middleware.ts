@@ -6,8 +6,12 @@ export function middleware(req: NextRequest) {
   const token = req.cookies.get("access_token")?.value;
   const { pathname } = req.nextUrl;
 
+  if (pathname === "/") {
+    return NextResponse.next();
+  }
+
   if (PUBLIC_ROUTES.some((r) => pathname.startsWith(r))) {
-    if (token) return NextResponse.redirect(new URL("/dashboard", req.url));
+    if (token) return NextResponse.redirect(new URL("/", req.url));
     return NextResponse.next();
   }
 
@@ -21,3 +25,4 @@ export function middleware(req: NextRequest) {
 export const config = {
   matcher: ["/((?!_next|api|favicon|public|images|fonts).*)"],
 };
+

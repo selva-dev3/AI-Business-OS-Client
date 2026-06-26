@@ -32,7 +32,7 @@ export const authApi = {
   resetPassword: (data: ResetPasswordData) =>
     apiPost<{ message: string }>(`${BASE}/reset-password`, data),
 
-  me: () => apiGet<UserAuthResponse["user"]>>(`${BASE}/me`),
+  me: () => apiGet<UserAuthResponse["user"]>(`${BASE}/me`),
 
   changePassword: (data: ChangePasswordData) =>
     apiPost<{ message: string }>(`${BASE}/change-password`, data),
