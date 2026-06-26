@@ -1,7 +1,9 @@
 import * as React from "react"
 
-export function Component() {
+export function PageHeader() {
   return (
-    <div>Component Placeholder</div>
+    <div className="flex items-center justify-between pb-4">
+      PageHeader Placeholder
+    </div>
   )
 }

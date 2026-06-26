@@ -1,7 +1,9 @@
 import * as React from "react"
 
-export function Component() {
+export function MobileNav() {
   return (
-    <div>Component Placeholder</div>
+    <nav className="md:hidden">
+      MobileNav Placeholder
+    </nav>
   )
 }

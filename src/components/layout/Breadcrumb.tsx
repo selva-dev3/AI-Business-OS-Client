@@ -1,7 +1,9 @@
 import * as React from "react"
 
-export function Component() {
+export function Breadcrumb() {
   return (
-    <div>Component Placeholder</div>
+    <nav className="flex" aria-label="Breadcrumb">
+      Breadcrumb Placeholder
+    </nav>
   )
 }
