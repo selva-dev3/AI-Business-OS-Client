@@ -1,4 +1,4 @@
-import { ListParams, PaginationMeta } from "@/api/client";
+import { ListParams, PaginationMeta } from "@/hooks/queries/client";
 
 export type Employee = {
   id: string;

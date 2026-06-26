@@ -1,4 +1,4 @@
-import { ListParams } from "@/api/client";
+import { ListParams } from "@/hooks/queries/client";
 
 export type UserRole = {
   id: string;

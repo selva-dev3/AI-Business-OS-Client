@@ -1,10 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-
+import { authApi } from "./auth.api";
+import { authKeys } from "./auth.keys";
 import { useAuthStore } from "@/store/authStore";
 import { auth } from "@/lib/auth";
-import { authApi, authKeys, ChangePasswordData, TwoFactorVerifyData } from "@/hooks/queries/auth";
-import { LoginCredentials, RegisterData, ForgotPasswordData, ResetPasswordData } from "@/types/auth";
-
+import {
+  LoginCredentials,
+  RegisterData,
+  ForgotPasswordData,
+  ResetPasswordData,
+  ChangePasswordData,
+  TwoFactorVerifyData,
+} from "./auth.types";
 
 export function useAuthMe() {
   return useQuery({

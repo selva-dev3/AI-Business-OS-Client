@@ -1,5 +1,5 @@
-import { apiGet, apiPost, apiPatch, apiDelete } from "@/api/client";
-import { buildQueryString } from "@/api/utils";
+import { apiGet, apiPost, apiPatch, apiDelete } from "@/hooks/queries/client";
+import { buildQueryString } from "@/hooks/queries/utils";
 import {
   CompanyDetailResponse,
   UpdateCompanyData,

@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import LandingPage from "@/components/LandingPage";
 import { useAuth } from "@/hooks/use-auth";
+import { useDashboardActivity } from "@/hooks/queries/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -44,46 +44,36 @@ const quickModules = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Recent activity entries                                            */
+/*  Landing Page import                                               */
 /* ------------------------------------------------------------------ */
-const activities = [
-  {
-    text: "Lead 'Apex Corp' moved to Negotiation",
-    module: "CRM",
-    time: "10 min ago",
-    dot: "bg-emerald-500",
-  },
-  {
-    text: "Purchase Order #PO-2026-089 approved",
-    module: "Procurement",
-    time: "1 hr ago",
-    dot: "bg-indigo-500",
-  },
-  {
-    text: "'UltraBook 15' below safety threshold",
-    module: "Inventory",
-    time: "3 hrs ago",
-    dot: "bg-rose-500",
-  },
-  {
-    text: "Payroll June 2026 calculation started",
-    module: "HRMS",
-    time: "5 hrs ago",
-    dot: "bg-orange-500",
-  },
-  {
-    text: "Invoice INV-2026-890 payment received",
-    module: "Finance",
-    time: "6 hrs ago",
-    dot: "bg-emerald-500",
-  },
-];
+import LandingPage from "@/components/LandingPage";
 
 /* ================================================================== */
 /*  Component                                                          */
 /* ================================================================== */
 export default function DashboardPage() {
   const { isAuthenticated, user } = useAuth();
+  const { data: activityData, isLoading } = useDashboardActivity(
+    { limit: 10 },
+    { enabled: isAuthenticated }
+  );
+
+  const getModuleDotColor = (mod: string) => {
+    switch (mod) {
+      case "CRM":
+        return "bg-emerald-500";
+      case "PROCUREMENT":
+        return "bg-indigo-500";
+      case "INVENTORY":
+        return "bg-rose-500";
+      case "HRMS":
+        return "bg-orange-500";
+      case "FINANCE":
+        return "bg-teal-500";
+      default:
+        return "bg-slate-400";
+    }
+  };
 
   // If not logged in, render the Landing Page
   if (!isAuthenticated) {
@@ -254,20 +244,46 @@ export default function DashboardPage() {
           <h2 className="text-[16px] font-bold text-slate-900">Recent Activity</h2>
           <Card className="border-slate-200 bg-white shadow-sm">
             <CardContent className="pt-5 space-y-4">
-              {activities.map((act, idx) => (
-                <div key={idx} className="flex gap-3 items-start">
-                  <div className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${act.dot}`} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] text-slate-700 leading-snug">{act.text}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
-                        {act.module}
-                      </span>
-                      <span className="text-[10px] text-slate-400">{act.time}</span>
+              {isLoading ? (
+                <div className="space-y-3 py-2">
+                  {[1, 2, 3].map((n) => (
+                    <div key={n} className="flex gap-3 items-center animate-pulse">
+                      <div className="h-2 w-2 rounded-full bg-slate-200 shrink-0" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-3 bg-slate-200 rounded w-5/6" />
+                        <div className="h-2 bg-slate-100 rounded w-1/4" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : !activityData?.activities?.length ? (
+                <p className="text-[12px] text-slate-400 text-center py-6">No recent activity found.</p>
+              ) : (
+                activityData.activities.map((act, idx) => (
+                  <div key={idx} className="flex gap-3 items-start animate-in fade-in duration-200">
+                    <div className={`h-2 w-2 rounded-full mt-1.5 shrink-0 ${getModuleDotColor(act.module)}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-slate-700 leading-snug font-medium">
+                        {act.title}
+                      </p>
+                      <p className="text-[11px] text-slate-500 mt-0.5">{act.description}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[9px] font-medium text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
+                          {act.module}
+                        </span>
+                        {act.user?.name && (
+                          <span className="text-[10px] text-slate-400">
+                            by {act.user.name}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-slate-400">
+                          {new Date(act.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
 

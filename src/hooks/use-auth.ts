@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
 import { auth } from "@/lib/auth";
-import { authApi } from "@/api/auth/auth.api";
+import { authApi } from "@/hooks/queries/auth/auth.api";
 import { LoginCredentials, User } from "@/types/auth";
 
 /* ------------------------------------------------------------------ */
@@ -85,7 +85,7 @@ export function useAuth() {
     mutationFn: async () => {
       const refreshToken = auth.getRefreshToken();
       if (refreshToken) {
-        await authApi.logout(refreshToken).catch(() => {});
+        await authApi.logout(refreshToken).catch(() => { });
       }
     },
     onSuccess: () => {

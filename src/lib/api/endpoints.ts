@@ -7,6 +7,9 @@ export const endpoints = {
     refresh: "/auth/refresh",
     me: "/auth/me",
   },
+  dashboard: {
+    dashboard: "/dashboard",
+  },
   hrms: {
     employees: "/hrms/employees",
     departments: "/hrms/departments",

@@ -51,7 +51,18 @@ export type ForgotPasswordData = {
 };
 
 export type ResetPasswordData = {
+  email: string;
   otp: string;
   newPassword: string;
   confirmPassword: string;
+};
+export type ChangePasswordData = {
+  currentPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
+export type TwoFactorVerifyData = {
+  code: string;
+  rememberMe?: boolean;
 };
