@@ -1,72 +1,74 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
 import { auth } from "@/lib/auth";
 import { api } from "@/lib/api/client";
-import { LoginCredentials } from "@/types/auth";
+import { LoginCredentials, User } from "@/types/auth";
 
 export function useAuth() {
-  const { user, isAuthenticated, isLoading, setUser, logout: storeLogout, setLoading } = useAuthStore();
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+  const { setUser, logout: storeLogout } = useAuthStore();
 
-  useEffect(() => {
-    const initAuth = async () => {
+  // Fetch current user details via TanStack Query
+  const {
+    data: user,
+    isLoading: isFetchLoading,
+  } = useQuery<User | null>({
+    queryKey: ["auth", "me"],
+    queryFn: async () => {
       const token = auth.getAccessToken();
-      if (token && !user) {
-        try {
-          setLoading(true);
-          const { data } = await api.get("/auth/me");
-          setUser(data);
-        } catch (err) {
-          storeLogout();
-        } finally {
-          setLoading(false);
-        }
-      } else if (!token) {
-        setLoading(false);
+      if (!token) return null;
+      try {
+        const { data } = await api.get("/auth/me");
+        setUser(data);
+        return data;
+      } catch (err) {
+        auth.clearTokens();
+        storeLogout();
+        return null;
       }
-    };
-    initAuth();
-  }, [user, setUser, storeLogout, setLoading]);
+    },
+    retry: false,
+    refetchOnWindowFocus: false,
+  });
 
-  const login = async (credentials: LoginCredentials) => {
-    setLoading(true);
-    setError(null);
-    try {
+  // Login mutation
+  const loginMutation = useMutation({
+    mutationFn: async (credentials: LoginCredentials) => {
       const response = await api.post("/auth/login", {
         email: credentials.email,
         password: credentials.password,
       });
-
-      const { accessToken, refreshToken, user: userData } = response.data;
+      return response.data;
+    },
+    onSuccess: (data) => {
+      const { accessToken, refreshToken, user: userData } = data;
       auth.setTokens(accessToken, refreshToken);
       setUser(userData);
-      return userData;
-    } catch (err: any) {
-      const message = err.response?.data?.message || "Invalid credentials";
-      setError(message);
-      throw new Error(message);
-    } finally {
-      setLoading(false);
-    }
-  };
+      queryClient.setQueryData(["auth", "me"], userData);
+    },
+  });
 
-  const logout = async () => {
-    try {
+  // Logout mutation
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
       await api.post("/auth/logout").catch(() => {});
-    } finally {
+    },
+    onSuccess: () => {
       auth.clearTokens();
       storeLogout();
-    }
-  };
+      queryClient.setQueryData(["auth", "me"], null);
+      queryClient.clear();
+    },
+  });
 
   return {
-    user,
-    isAuthenticated,
-    isLoading,
-    error,
-    login,
-    logout,
+    user: user || null,
+    isAuthenticated: !!user,
+    isLoading: isFetchLoading || loginMutation.isPending || logoutMutation.isPending,
+    error: loginMutation.error ? (loginMutation.error as any).response?.data?.message || "Invalid credentials" : null,
+    login: loginMutation.mutateAsync,
+    logout: logoutMutation.mutateAsync,
   };
 }

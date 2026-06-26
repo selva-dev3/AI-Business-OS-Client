@@ -5,9 +5,7 @@ import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod"; 
-import { useAuthStore } from "@/store/authStore";
-import { auth } from "@/lib/auth";
-import { api } from "@/lib/api/client";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -26,7 +24,7 @@ type LoginValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const { setUser, setLoading } = useAuthStore();
+  const { login } = useAuth();
   const [isPending, setIsPending] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
 
@@ -41,25 +39,16 @@ export default function LoginPage() {
 
   const onSubmit = async (values: LoginValues) => {
     setIsPending(true);
-    setLoading(true);
     try {
-      const loginResponse = await api.post("/auth/login", {
+      await login({
         email: values.email,
         password: values.password,
       });
 
-      const { accessToken, refreshToken, user } = loginResponse.data;
-
-      auth.setTokens(accessToken, refreshToken);
-      setUser(user);
-
       toast.success("Successfully logged in!");
       router.push("/");
     } catch (error: any) {
-      const message = error.response?.data?.message || "Invalid credentials. Please try again.";
-      toast.error(message);
-      setUser(null as any);
-      setLoading(false);
+      toast.error(error.message || "Invalid credentials. Please try again.");
     } finally {
       setIsPending(false);
     }
