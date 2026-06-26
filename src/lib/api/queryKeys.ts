@@ -32,6 +32,9 @@ export const queryKeys = {
     list: () => ["payroll", "list"] as const,
     detail: (id: string) => ["payroll", "detail", id] as const,
   },
+  crm: {
+    dashboard: (params?: unknown) => ["crm", "dashboard", params] as const,
+  },
   leads: {
     all: ["leads"] as const,
     list: (params?: unknown) => ["leads", "list", params] as const,

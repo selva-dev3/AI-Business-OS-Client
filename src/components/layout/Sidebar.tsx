@@ -55,6 +55,7 @@ const navItems: NavItem[] = [
     href: "/hrms",
     icon: Briefcase,
     children: [
+      { label: "Dashboard", href: "/hrms" },
       { label: "Employees", href: "/hrms/employees" },
       { label: "Attendance", href: "/hrms/attendance" },
       { label: "Leave", href: "/hrms/leave" },
@@ -68,6 +69,7 @@ const navItems: NavItem[] = [
     href: "/crm",
     icon: Users,
     children: [
+      { label: "Dashboard", href: "/crm" },
       { label: "Leads", href: "/crm/leads" },
       { label: "Deals", href: "/crm/deals" },
       { label: "Contacts", href: "/crm/contacts" },
@@ -80,6 +82,7 @@ const navItems: NavItem[] = [
     href: "/finance",
     icon: DollarSign,
     children: [
+      { label: "Dashboard", href: "/finance" },
       { label: "Invoices", href: "/finance/invoices" },
       { label: "Expenses", href: "/finance/expenses" },
       { label: "Payments", href: "/finance/payments" },
@@ -92,6 +95,7 @@ const navItems: NavItem[] = [
     href: "/inventory",
     icon: Boxes,
     children: [
+      { label: "Dashboard", href: "/inventory" },
       { label: "Products", href: "/inventory/products" },
       { label: "Warehouses", href: "/inventory/warehouses" },
       { label: "Stock", href: "/inventory/stock" },
@@ -104,6 +108,7 @@ const navItems: NavItem[] = [
     href: "/procurement",
     icon: ShoppingCart,
     children: [
+      { label: "Dashboard", href: "/procurement" },
       { label: "Vendors", href: "/procurement/vendors" },
       { label: "RFQ", href: "/procurement/rfq" },
       { label: "Purchase Orders", href: "/procurement/purchase-orders" },
@@ -115,6 +120,7 @@ const navItems: NavItem[] = [
     href: "/projects",
     icon: FolderKanban,
     children: [
+      { label: "Dashboard", href: "/projects" },
       { label: "Tasks", href: "/projects/tasks" },
       { label: "Milestones", href: "/projects/milestones" },
       { label: "Timesheets", href: "/projects/timesheets" },
