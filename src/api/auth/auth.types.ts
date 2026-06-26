@@ -52,8 +52,11 @@ export type UserPermission = {
 };
 
 export type UserAuthResponse = {
-  accessToken: string;
-  refreshToken: string;
+
+  tokens?: {
+    accessToken: string;
+    refreshToken: string;
+  }
   user: {
     id: string;
     email: string;

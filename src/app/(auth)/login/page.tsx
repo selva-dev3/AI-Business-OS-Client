@@ -12,7 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"; 
 import Link from "next/link";
 import { toast } from "sonner";
-import { Loader2, Lock, Mail, Eye, EyeOff } from "lucide-react";
+import { Loader2, Lock, Mail, Eye, EyeOff, ChevronDown, UserCircle } from "lucide-react";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -22,11 +22,32 @@ const loginSchema = z.object({
 
 type LoginValues = z.infer<typeof loginSchema>;
 
+const demoAccounts = [
+  {
+    label: "Admin",
+    email: "selvakumar152000@gmail.com",
+    password: "Selvam143",
+  },
+];
+
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
   const [isPending, setIsPending] = React.useState(false);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [showDemoDropdown, setShowDemoDropdown] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  React.useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowDemoDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const form = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
@@ -36,6 +57,12 @@ export default function LoginPage() {
       rememberMe: false,
     },
   });
+
+  const fillDemoCredentials = (account: typeof demoAccounts[0]) => {
+    form.setValue("email", account.email);
+    form.setValue("password", account.password);
+    setShowDemoDropdown(false);
+  };
 
   const onSubmit = async (values: LoginValues) => {
     setIsPending(true);
@@ -62,6 +89,35 @@ export default function LoginPage() {
         <CardDescription className="text-center text-muted-foreground">
           Enter your email and password to access your account
         </CardDescription>
+
+        {/* Demo credentials dropdown */}
+        <div className="relative pt-2" ref={dropdownRef}>
+          <button
+            type="button"
+            onClick={() => setShowDemoDropdown(!showDemoDropdown)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50 text-[13px] font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+          >
+            <UserCircle className="h-4 w-4" />
+            Use demo credentials
+            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showDemoDropdown ? "rotate-180" : ""}`} />
+          </button>
+
+          {showDemoDropdown && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-20 rounded-lg border border-slate-200 bg-white shadow-lg py-1 animate-in fade-in slide-in-from-top-1 duration-150">
+              {demoAccounts.map((account) => (
+                <button
+                  key={account.email}
+                  type="button"
+                  onClick={() => fillDemoCredentials(account)}
+                  className="w-full text-left px-3 py-2.5 hover:bg-slate-50 transition-colors"
+                >
+                  <p className="text-[13px] font-semibold text-slate-800">{account.label}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">{account.email}</p>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         <Form {...form}>

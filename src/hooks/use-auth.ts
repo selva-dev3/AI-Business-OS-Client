@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@/store/authStore";
 import { auth } from "@/lib/auth";
-import { api } from "@/lib/api/client";
+import { authApi } from "@/api/auth/auth.api";
 import { LoginCredentials, User } from "@/types/auth";
 
 /* ------------------------------------------------------------------ */
@@ -35,28 +34,25 @@ export function useAuth() {
   const storeUser = useAuthStore((s) => s.user);
   const storeIsAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const storeIsLoading = useAuthStore((s) => s.isLoading);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const setUser = useAuthStore((s) => s.setUser);
   const setLoading = useAuthStore((s) => s.setLoading);
   const storeLogout = useAuthStore((s) => s.logout);
 
   // Background query to validate / refresh the session
-  const { isLoading: isFetchLoading } = useQuery<User | null>({
+  useQuery<User | null>({
     queryKey: ["auth", "me"],
     queryFn: async () => {
       const token = auth.getAccessToken();
-      if (!token) {
-        // No token → not logged in, but don't wipe store yet
-        // (store hydration from localStorage may not have happened)
-        return null;
-      }
+      if (!token) return null;
       try {
-        const response = await api.get("/auth/me");
-        const rawUser = response.data?.data || response.data;
+        // authApi.me() already unwraps { success, data } via apiGet
+        const rawUser = await authApi.me();
         const mapped = mapUser(rawUser);
         setUser(mapped);
         return mapped;
       } catch (err: any) {
-        // Only log out on a definitive 401 (token invalid/expired)
+        // Only log out on a definitive 401
         if (err?.response?.status === 401) {
           auth.clearTokens();
           storeLogout();
@@ -66,31 +62,19 @@ export function useAuth() {
     },
     retry: false,
     refetchOnWindowFocus: false,
-    // Don't run the query if there's no token at all
-    enabled: typeof window !== "undefined" && !!auth.getAccessToken(),
+    enabled: hasHydrated && typeof window !== "undefined" && !!auth.getAccessToken(),
   });
 
-  // Once the background fetch settles, mark loading as done
-  useEffect(() => {
-    if (!isFetchLoading && storeIsLoading) {
-      setLoading(false);
-    }
-  }, [isFetchLoading, storeIsLoading, setLoading]);
-
-  // Login mutation
+  // Login mutation — uses authApi which already unwraps the response
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginCredentials) => {
-      const response = await api.post("/auth/login", {
-        email: credentials.email,
-        password: credentials.password,
-      });
-      // API wraps response as { success, data: { accessToken, refreshToken, user } }
-      return response.data?.data || response.data;
+      const result = await authApi.login(credentials);
+      return result;
     },
-    onSuccess: (data: any) => {
-      const { accessToken, refreshToken, user: rawUser } = data;
-      auth.setTokens(accessToken, refreshToken);
-      const mapped = mapUser(rawUser);
+    onSuccess: (data) => {
+      // data is already unwrapped: { accessToken, refreshToken, user }
+      auth.setTokens(data.tokens!.accessToken, data.tokens!.refreshToken);
+      const mapped = mapUser(data.user);
       setUser(mapped);
       queryClient.setQueryData(["auth", "me"], mapped);
     },
@@ -99,7 +83,10 @@ export function useAuth() {
   // Logout mutation
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await api.post("/auth/logout").catch(() => {});
+      const refreshToken = auth.getRefreshToken();
+      if (refreshToken) {
+        await authApi.logout(refreshToken).catch(() => {});
+      }
     },
     onSuccess: () => {
       auth.clearTokens();
@@ -109,10 +96,12 @@ export function useAuth() {
     },
   });
 
+  const isLoading = !hasHydrated || storeIsLoading || loginMutation.isPending || logoutMutation.isPending;
+
   return {
     user: storeUser,
     isAuthenticated: storeIsAuthenticated,
-    isLoading: storeIsLoading || loginMutation.isPending || logoutMutation.isPending,
+    isLoading,
     error: loginMutation.error
       ? (loginMutation.error as any).response?.data?.message || "Invalid credentials"
       : null,

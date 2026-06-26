@@ -27,7 +27,7 @@ export function useLogin() {
   return useMutation({
     mutationFn: (data: LoginCredentials) => authApi.login(data),
     onSuccess: (data) => {
-      auth.setTokens(data.accessToken, data.refreshToken);
+      auth.setTokens(data.tokens!.accessToken, data.tokens!.refreshToken);
       setUser({
         id: data.user.id,
         email: data.user.email,
