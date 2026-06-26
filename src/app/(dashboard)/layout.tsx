@@ -33,7 +33,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           sidebarCollapsed ? "pl-16" : "pl-60"
         )}
       >
-        <div className="p-6 max-w-7xl mx-auto">{children}</div>
+        <div className="p-2 max-w-7xl mx-auto">{children}</div>
       </main>
     </div>
   );
