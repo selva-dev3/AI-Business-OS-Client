@@ -55,6 +55,15 @@ export const queryKeys = {
     list: (params?: unknown) => ["deals", "list", params] as const,
     detail: (id: string) => ["deals", "detail", id] as const,
   },
+  activities: {
+    all: ["activities"] as const,
+    list: (params?: unknown) => ["activities", "list", params] as const,
+    detail: (id: string) => ["activities", "detail", id] as const,
+  },
+  pipeline: {
+    all: ["pipeline"] as const,
+    list: (params?: unknown) => ["pipeline", "list", params] as const,
+  },
   products: {
     all: ["products"] as const,
     list: (params?: unknown) => ["products", "list", params] as const,
