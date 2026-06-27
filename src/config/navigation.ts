@@ -27,6 +27,7 @@ export const navigation: NavItem[] = [
     children: [
       { label: "Employees", href: "/hrms/employees" },
       { label: "Departments", href: "/hrms/departments" },
+      { label: "Designations", href: "/hrms/designations" },
       { label: "Attendance", href: "/hrms/attendance" },
       { label: "Leave", href: "/hrms/leave" },
       { label: "Payroll", href: "/hrms/payroll" },

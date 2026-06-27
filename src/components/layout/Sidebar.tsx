@@ -61,6 +61,7 @@ const navItems: NavItem[] = [
       { label: "Leave", href: "/hrms/leave" },
       { label: "Payroll", href: "/hrms/payroll" },
       { label: "Departments", href: "/hrms/departments" },
+      {label: 'Designations', href: '/hrms/designations'},
       { label: "Assets", href: "/hrms/assets" },
     ],
   },

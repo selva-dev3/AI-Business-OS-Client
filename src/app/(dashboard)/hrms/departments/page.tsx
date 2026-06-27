@@ -197,7 +197,12 @@ export default function DepartmentsPage() {
 
   // Combined Active Catalog Data List
   const departmentsList = React.useMemo(() => {
-    const list = serverDepts && serverDepts.length > 0 ? serverDepts : localDepts;
+    const rawList = serverDepts && serverDepts.length > 0 ? serverDepts : localDepts;
+    const list = rawList.map((dept) => ({
+      ...dept,
+      id: dept.id || (dept as any)._id,
+      parentId: dept.parentId || (dept as any).parentId,
+    }));
 
     return list.map((dept) => {
       // Map parent and children references dynamically
