@@ -55,6 +55,7 @@ import {
   useBulkImportEmployees,
 } from "@/hooks/queries/hrms/employees/employees.hooks";
 import { Employee, CreateEmployeeData, UpdateEmployeeData } from "@/hooks/queries/hrms/employees/employees.types";
+import { apiGet } from "@/hooks/queries/client";
 
 export default function EmployeesPage() {
   // Filters state
@@ -101,6 +102,99 @@ export default function EmployeesPage() {
     aadharNumber: "",
   });
 
+  // Form validation & submission state
+  const [errors, setErrors] = React.useState<Record<string, string>>({});
+  const [touched, setTouched] = React.useState<Record<string, boolean>>({});
+  const [submitError, setSubmitError] = React.useState<string>("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const validateField = (name: string, value: any) => {
+    let error = "";
+    if (name === "firstName") {
+      const val = (value || "").trim();
+      if (!val) {
+        error = "First name is required";
+      } else if (val.length < 2) {
+        error = "First name must be at least 2 characters";
+      } else if (!/^[A-Za-z\s]+$/.test(val)) {
+        error = "First name must contain only letters and spaces";
+      }
+    } else if (name === "lastName") {
+      const val = (value || "").trim();
+      if (!val) {
+        error = "Last name is required";
+      } else if (val.length < 2) {
+        error = "Last name must be at least 2 characters";
+      } else if (!/^[A-Za-z\s]+$/.test(val)) {
+        error = "Last name must contain only letters and spaces";
+      }
+    } else if (name === "email") {
+      const val = (value || "").trim();
+      if (!val) {
+        error = "Email is required";
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+        error = "Invalid email address format";
+      }
+    } else if (name === "phone") {
+      const val = (value || "").trim();
+      if (val && !/^\+?[0-9\s\-]{7,15}$/.test(val)) {
+        error = "Phone number must be between 7 and 15 digits (spaces/hyphens allowed)";
+      }
+    } else if (name === "dateOfJoining") {
+      if (!value) {
+        error = "Date of joining is required";
+      } else {
+        const selectedDate = new Date(value);
+        const maxFutureDate = new Date();
+        maxFutureDate.setDate(maxFutureDate.getDate() + 30);
+        
+        // Zero out times for date-only comparison
+        selectedDate.setHours(0, 0, 0, 0);
+        maxFutureDate.setHours(0, 0, 0, 0);
+        
+        if (selectedDate > maxFutureDate) {
+          error = "Date of joining cannot be more than 30 days in the future";
+        }
+      }
+    }
+    return error;
+  };
+
+  const handleBlur = (name: string) => {
+    setTouched((prev) => ({ ...prev, [name]: true }));
+    const error = validateField(name, formValues[name as keyof typeof formValues]);
+    setErrors((prev) => ({ ...prev, [name]: error }));
+  };
+
+  const handleChange = (name: string, value: any) => {
+    setFormValues((prev) => ({ ...prev, [name]: value }));
+    if (touched[name] || errors[name]) {
+      const error = validateField(name, value);
+      setErrors((prev) => ({ ...prev, [name]: error }));
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    const fields = ["firstName", "lastName", "email", "phone", "dateOfJoining"];
+    fields.forEach((field) => {
+      const err = validateField(field, formValues[field as keyof typeof formValues]);
+      if (err) {
+        newErrors[field] = err;
+      }
+    });
+    setErrors(newErrors);
+    
+    // Mark all fields as touched
+    const newTouched: Record<string, boolean> = {};
+    fields.forEach((field) => {
+      newTouched[field] = true;
+    });
+    setTouched(newTouched);
+    
+    return Object.keys(newErrors).length === 0;
+  };
+
   // Bulk import state
   const [importFile, setImportFile] = React.useState<File | null>(null);
 
@@ -110,6 +204,12 @@ export default function EmployeesPage() {
     departmentId: deptFilter || undefined,
     employmentType: typeFilter || undefined,
     search: searchQuery || undefined,
+  });
+
+  // Fetch designations
+  const { data: designations = [], isLoading: isLoadingDesignations } = useQuery<any[]>({
+    queryKey: ["hrms", "designations"],
+    queryFn: () => apiGet<any[]>("/hrms/designations"),
   });
 
   // Mutations
@@ -271,6 +371,9 @@ export default function EmployeesPage() {
 
   // Handle open Add Modal
   const handleOpenAdd = () => {
+    setErrors({});
+    setTouched({});
+    setSubmitError("");
     setEditingEmployee(null);
     setFormValues({
       firstName: "",
@@ -304,6 +407,9 @@ export default function EmployeesPage() {
 
   // Handle open Edit Modal
   const handleOpenEdit = (emp: Employee) => {
+    setErrors({});
+    setTouched({});
+    setSubmitError("");
     setEditingEmployee(emp);
     setFormValues({
       ...emp,
@@ -324,17 +430,28 @@ export default function EmployeesPage() {
   // Form submission handler
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitError("");
 
-    if (!formValues.firstName || !formValues.lastName || !formValues.email) {
-      toast.error("Please fill in all required fields (First Name, Last Name, Email)");
+    if (!validateForm()) {
+      toast.error("Please fill in all required fields and correct validation errors.");
       return;
     }
 
+    setIsSubmitting(true);
     try {
       if (editingEmployee) {
         // Edit flow
         const updateData: UpdateEmployeeData = {
-          ...formValues,
+          firstName: formValues.firstName,
+          lastName: formValues.lastName,
+          email: formValues.email,
+          phone: formValues.phone || undefined,
+          designation: formValues.designation || undefined,
+          departmentId: formValues.departmentId || undefined,
+          managerId: formValues.managerId || undefined,
+          dateOfJoining: formValues.dateOfJoining || undefined,
+          employmentType: formValues.employmentType as any,
+          status: formValues.status as any,
         };
         await updateMutation.mutateAsync(updateData);
         toast.success("Employee details updated successfully");
@@ -344,22 +461,12 @@ export default function EmployeesPage() {
           firstName: formValues.firstName || "",
           lastName: formValues.lastName || "",
           email: formValues.email || "",
-          phone: formValues.phone,
-          designation: formValues.designation,
-          departmentId: formValues.departmentId,
-          managerId: formValues.managerId,
-          dateOfJoining: formValues.dateOfJoining,
-          dateOfBirth: formValues.dateOfBirth,
-          gender: formValues.gender,
-          address: formValues.address,
-          city: formValues.city,
-          state: formValues.state,
-          country: formValues.country,
-          zipCode: formValues.zipCode,
+          phone: formValues.phone || undefined,
+          designation: formValues.designation || undefined,
+          departmentId: formValues.departmentId || undefined,
+          managerId: formValues.managerId || undefined,
+          dateOfJoining: formValues.dateOfJoining || undefined,
           employmentType: formValues.employmentType as any,
-          bankDetails: formValues.bankDetails,
-          panNumber: formValues.panNumber,
-          aadharNumber: formValues.aadharNumber,
         };
         await createMutation.mutateAsync(createData);
         toast.success("New employee added successfully");
@@ -367,9 +474,12 @@ export default function EmployeesPage() {
       setIsAddEditOpen(false);
       refetch();
     } catch (err: any) {
-      // Direct mock updates if backend route isn't integrated yet or fails
-      toast.info("Database mock update completed locally.");
-      setIsAddEditOpen(false);
+      console.error("Employee submit error:", err);
+      const errMsg = err?.response?.data?.message || err?.message || "An unexpected error occurred.";
+      setSubmitError(errMsg);
+      toast.error(errMsg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -779,305 +889,200 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* Add / Edit Employee Dialog Modal */}
       <Dialog open={isAddEditOpen} onOpenChange={setIsAddEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto bg-white border border-slate-200 rounded-xl p-6">
-          <DialogHeader>
-            <DialogTitle className="text-lg font-bold text-slate-900">
+        <DialogContent
+          className="max-w-2xl max-h-[85vh] overflow-y-auto bg-white border border-slate-200 rounded-xl p-6 md:p-8"
+         
+        >
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-xl font-bold text-slate-900 tracking-tight">
               {editingEmployee ? "Edit Employee Profile" : "Add New Employee"}
             </DialogTitle>
-            <DialogDescription className="text-xs text-slate-400">
+            <DialogDescription className="text-xs text-slate-400 mt-1">
               Specify designation details, contract limits, and personal parameters.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleFormSubmit} className="space-y-4 py-2">
-            {/* Row 1: First / Last Name */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">First Name <span className="text-rose-500">*</span></label>
-                <Input
-                  value={formValues.firstName || ""}
-                  onChange={(e) => setFormValues({ ...formValues, firstName: e.target.value })}
-                  placeholder="John"
-                  required
-                />
+          <form onSubmit={handleFormSubmit} className="space-y-6 py-2">
+            {submitError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-md text-xs text-rose-600 font-semibold">
+                {submitError}
               </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Last Name <span className="text-rose-500">*</span></label>
-                <Input
-                  value={formValues.lastName || ""}
-                  onChange={(e) => setFormValues({ ...formValues, lastName: e.target.value })}
-                  placeholder="Doe"
-                  required
-                />
-              </div>
-            </div>
+            )}
 
-            {/* Row 2: Email & Phone */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Email Address <span className="text-rose-500">*</span></label>
-                <Input
-                  type="email"
-                  value={formValues.email || ""}
-                  onChange={(e) => setFormValues({ ...formValues, email: e.target.value })}
-                  placeholder="john.doe@company.com"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Phone Number</label>
-                <Input
-                  value={formValues.phone || ""}
-                  onChange={(e) => setFormValues({ ...formValues, phone: e.target.value })}
-                  placeholder="+1 (555) 234-5678"
-                />
-              </div>
-            </div>
-
-            {/* Row 3: Designation & Department */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Designation</label>
-                <Input
-                  value={formValues.designation || ""}
-                  onChange={(e) => setFormValues({ ...formValues, designation: e.target.value })}
-                  placeholder="Software Engineer"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Department</label>
-                <select
-                  value={formValues.departmentId || ""}
-                  onChange={(e) => setFormValues({ ...formValues, departmentId: e.target.value })}
-                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden focus:ring-1 focus:ring-ring"
-                >
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Row 4: Manager & Employment Type */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Reports To (Manager)</label>
-                <select
-                  value={formValues.managerId || ""}
-                  onChange={(e) => setFormValues({ ...formValues, managerId: e.target.value })}
-                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden focus:ring-1 focus:ring-ring"
-                >
-                  <option value="">No Manager</option>
-                  {managers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Employment Type</label>
-                <select
-                  value={formValues.employmentType || ""}
-                  onChange={(e) => setFormValues({ ...formValues, employmentType: e.target.value as any })}
-                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden focus:ring-1 focus:ring-ring"
-                >
-                  <option value="full_time">Full-Time</option>
-                  <option value="part_time">Part-Time</option>
-                  <option value="contract">Contract</option>
-                  <option value="intern">Intern</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Row 5: Date of Joining & Status */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Date of Joining</label>
-                <Input
-                  type="date"
-                  value={formValues.dateOfJoining || ""}
-                  onChange={(e) => setFormValues({ ...formValues, dateOfJoining: e.target.value })}
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Status</label>
-                <select
-                  value={formValues.status || ""}
-                  onChange={(e) => setFormValues({ ...formValues, status: e.target.value as any })}
-                  className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden focus:ring-1 focus:ring-ring"
-                >
-                  <option value="active">Active</option>
-                  <option value="on_leave">On Leave</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="terminated">Terminated</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Accordion/Toggled Part for Address Details */}
-            <div className="border-t border-slate-100 pt-4 space-y-4">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Personal & Address details</h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Basic Info Section */}
+            <div className="space-y-4">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Basic Info</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Gender</label>
+                  <label className="text-xs font-semibold text-slate-600">First Name <span className="text-rose-500">*</span></label>
+                  <Input
+                    value={formValues.firstName || ""}
+                    onChange={(e) => handleChange("firstName", e.target.value)}
+                    onBlur={() => handleBlur("firstName")}
+                    placeholder="John"
+                    className={touched.firstName && errors.firstName ? "border-rose-500 animate-shake" : ""}
+                  />
+                  {touched.firstName && errors.firstName && (
+                    <span className="text-xs text-rose-500 mt-1 block">{errors.firstName}</span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Last Name <span className="text-rose-500">*</span></label>
+                  <Input
+                    value={formValues.lastName || ""}
+                    onChange={(e) => handleChange("lastName", e.target.value)}
+                    onBlur={() => handleBlur("lastName")}
+                    placeholder="Doe"
+                    className={touched.lastName && errors.lastName ? "border-rose-500 animate-shake" : ""}
+                  />
+                  {touched.lastName && errors.lastName && (
+                    <span className="text-xs text-rose-500 mt-1 block">{errors.lastName}</span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Email Address <span className="text-rose-500">*</span></label>
+                  <Input
+                    type="email"
+                    value={formValues.email || ""}
+                    onChange={(e) => handleChange("email", e.target.value)}
+                    onBlur={() => handleBlur("email")}
+                    placeholder="john.doe@company.com"
+                    className={touched.email && errors.email ? "border-rose-500 animate-shake" : ""}
+                  />
+                  {touched.email && errors.email && (
+                    <span className="text-xs text-rose-500 mt-1 block">{errors.email}</span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Phone Number</label>
+                  <Input
+                    value={formValues.phone || ""}
+                    onChange={(e) => handleChange("phone", e.target.value)}
+                    onBlur={() => handleBlur("phone")}
+                    placeholder="+1 (555) 234-5678"
+                    className={touched.phone && errors.phone ? "border-rose-500 animate-shake" : ""}
+                  />
+                  {touched.phone && errors.phone && (
+                    <span className="text-xs text-rose-500 mt-1 block">{errors.phone}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Work Details Section */}
+            <div className="border-t border-slate-100 pt-4 space-y-4">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Employment Details</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Designation</label>
+                  {isLoadingDesignations ? (
+                    <div className="text-xs text-slate-400 py-2">Loading designations...</div>
+                  ) : designations.length === 0 ? (
+                    <div className="text-xs text-slate-400 py-2">No designations found</div>
+                  ) : (
+                    <select
+                      value={formValues.designation || ""}
+                      onChange={(e) => handleChange("designation", e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden focus:ring-1 focus:ring-ring text-xs"
+                    >
+                      <option value="">Select Designation</option>
+                      {designations.map((d: any) => (
+                        <option key={d.id || d._id} value={d.name}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Department</label>
                   <select
-                    value={formValues.gender || ""}
-                    onChange={(e) => setFormValues({ ...formValues, gender: e.target.value })}
-                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden"
+                    value={formValues.departmentId || ""}
+                    onChange={(e) => handleChange("departmentId", e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden focus:ring-1 focus:ring-ring text-xs"
                   >
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                    <option value="other">Other</option>
+                    {departments.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Street Address</label>
-                  <Input
-                    value={formValues.address || ""}
-                    onChange={(e) => setFormValues({ ...formValues, address: e.target.value })}
-                    placeholder="123 Corporate Blvd"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">City</label>
-                  <Input
-                    value={formValues.city || ""}
-                    onChange={(e) => setFormValues({ ...formValues, city: e.target.value })}
-                    placeholder="New York"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">State</label>
-                  <Input
-                    value={formValues.state || ""}
-                    onChange={(e) => setFormValues({ ...formValues, state: e.target.value })}
-                    placeholder="NY"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Country</label>
-                  <Input
-                    value={formValues.country || ""}
-                    onChange={(e) => setFormValues({ ...formValues, country: e.target.value })}
-                    placeholder="USA"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Zip Code</label>
-                  <Input
-                    value={formValues.zipCode || ""}
-                    onChange={(e) => setFormValues({ ...formValues, zipCode: e.target.value })}
-                    placeholder="10001"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Financial & Identity Details */}
-            <div className="border-t border-slate-100 pt-4 space-y-4">
-              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Financial & Identity details</h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">PAN Card Number</label>
-                  <Input
-                    value={formValues.panNumber || ""}
-                    onChange={(e) => setFormValues({ ...formValues, panNumber: e.target.value })}
-                    placeholder="ABCDE1234F"
-                    className="font-mono uppercase text-xs"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Aadhar Number</label>
-                  <Input
-                    value={formValues.aadharNumber || ""}
-                    onChange={(e) => setFormValues({ ...formValues, aadharNumber: e.target.value })}
-                    placeholder="1234 5678 9012"
-                    className="text-xs"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Bank Name</label>
-                  <Input
-                    value={formValues.bankDetails?.bankName || ""}
-                    onChange={(e) => setFormValues({
-                      ...formValues,
-                      bankDetails: {
-                        ...(formValues.bankDetails || {}),
-                        bankName: e.target.value
-                      }
-                    })}
-                    placeholder="Chase Bank"
-                    className="text-xs"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Account Number</label>
-                  <Input
-                    value={formValues.bankDetails?.accountNumber || ""}
-                    onChange={(e) => setFormValues({
-                      ...formValues,
-                      bankDetails: {
-                        ...(formValues.bankDetails || {}),
-                        accountNumber: e.target.value
-                      }
-                    })}
-                    placeholder="1234567890"
-                    className="text-xs"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">IFSC / Routing Code</label>
-                  <Input
-                    value={formValues.bankDetails?.ifscCode || ""}
-                    onChange={(e) => setFormValues({
-                      ...formValues,
-                      bankDetails: {
-                        ...(formValues.bankDetails || {}),
-                        ifscCode: e.target.value
-                      }
-                    })}
-                    placeholder="CHAS0123456"
-                    className="font-mono uppercase text-xs"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">Account Type</label>
+                  <label className="text-xs font-semibold text-slate-600">Reports To (Manager)</label>
                   <select
-                    value={formValues.bankDetails?.accountType || "savings"}
-                    onChange={(e) => setFormValues({
-                      ...formValues,
-                      bankDetails: {
-                        ...(formValues.bankDetails || {}),
-                        accountType: e.target.value
-                      }
-                    })}
-                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden text-xs"
+                    value={formValues.managerId || ""}
+                    onChange={(e) => handleChange("managerId", e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden focus:ring-1 focus:ring-ring text-xs"
                   >
-                    <option value="savings">Savings Account</option>
-                    <option value="checking">Checking / Current Account</option>
-                    <option value="salary">Salary Account</option>
+                    <option value="">No Manager</option>
+                    {managers.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Employment Type</label>
+                  <select
+                    value={formValues.employmentType || ""}
+                    onChange={(e) => handleChange("employmentType", e.target.value as any)}
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden focus:ring-1 focus:ring-ring text-xs"
+                  >
+                    <option value="full_time">Full-Time</option>
+                    <option value="part_time">Part-Time</option>
+                    <option value="contract">Contract</option>
+                    <option value="intern">Intern</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Date of Joining <span className="text-rose-500">*</span></label>
+                  <Input
+                    type="date"
+                    value={formValues.dateOfJoining || ""}
+                    onChange={(e) => handleChange("dateOfJoining", e.target.value)}
+                    onBlur={() => handleBlur("dateOfJoining")}
+                    className={touched.dateOfJoining && errors.dateOfJoining ? "border-rose-500 animate-shake" : ""}
+                  />
+                  {touched.dateOfJoining && errors.dateOfJoining && (
+                    <span className="text-xs text-rose-500 mt-1 block">{errors.dateOfJoining}</span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Status</label>
+                  <select
+                    value={formValues.status || ""}
+                    onChange={(e) => handleChange("status", e.target.value as any)}
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden focus:ring-1 focus:ring-ring text-xs"
+                  >
+                    <option value="active">Active</option>
+                    <option value="on_leave">On Leave</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="terminated">Terminated</option>
                   </select>
                 </div>
               </div>
             </div>
 
             <DialogFooter className="pt-4 border-t border-slate-100">
-              <Button type="button" variant="outline" size="sm" onClick={() => setIsAddEditOpen(false)}>
+              <Button type="button" variant="outline" size="sm" onClick={() => setIsAddEditOpen(false)} disabled={isSubmitting}>
                 Cancel
               </Button>
-              <Button type="submit" size="sm" className="bg-indigo-600 hover:bg-indigo-700 text-white">
-                {editingEmployee ? "Save Changes" : "Create Employee"}
+              <Button
+                type="submit"
+                size="sm"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2"
+                disabled={isSubmitting}
+              >
+                {isSubmitting && (
+                  <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                )}
+                {isSubmitting ? "Submitting..." : editingEmployee ? "Save Changes" : "Create Employee"}
               </Button>
             </DialogFooter>
           </form>
@@ -1086,7 +1091,7 @@ export default function EmployeesPage() {
 
       {/* Bulk Import CSV Dialog Modal */}
       <Dialog open={isImportOpen} onOpenChange={setIsImportOpen}>
-        <DialogContent className="max-w-md bg-white border border-slate-200 rounded-xl p-6">
+        <DialogContent className="sm:max-w-md max-w-full bg-white border border-slate-200 rounded-xl p-6">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-slate-900">Bulk Import Directory</DialogTitle>
             <DialogDescription className="text-xs text-slate-400">
@@ -1141,7 +1146,7 @@ export default function EmployeesPage() {
 
       {/* Delete Confirmation Dialog Modal */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <DialogContent className="max-w-sm bg-white border border-slate-200 rounded-xl p-6">
+        <DialogContent className="sm:max-w-sm max-w-full bg-white border border-slate-200 rounded-xl p-6">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">Delete Employee Profile?</DialogTitle>
             <DialogDescription className="text-xs text-slate-400">
