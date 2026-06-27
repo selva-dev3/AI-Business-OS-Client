@@ -54,6 +54,7 @@ import {
 } from "@/hooks/queries/hrms/employees/employees.hooks";
 import { Employee, CreateEmployeeData, UpdateEmployeeData } from "@/hooks/queries/hrms/employees/employees.types";
 import { apiGet } from "@/hooks/queries/client";
+import { DataTable, Column } from "@/components/shared/datatable";
 
 export default function EmployeesPage() {
   // Filters state
@@ -564,6 +565,89 @@ export default function EmployeesPage() {
     return `${first.charAt(0)}${last.charAt(0)}`.toUpperCase();
   };
 
+  const columns: Column<Employee>[] = [
+    {
+      header: "Employee",
+      cell: (emp) => (
+        <Link
+          href={`/hrms/employees/${emp.id}`}
+          className="flex items-center gap-3 group/link hover:text-indigo-600 transition-colors"
+        >
+          <Avatar size="lg" className="h-9 w-9 rounded-full bg-indigo-50 border border-slate-200 group-hover/link:border-indigo-400 transition-colors">
+            <AvatarImage src={emp.avatar} alt={emp.firstName} />
+            <AvatarFallback className="text-indigo-700 bg-indigo-50 text-[11px] font-bold">
+              {getInitials(emp.firstName, emp.lastName)}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <p className="font-semibold text-slate-900 leading-tight group-hover/link:underline">
+              {emp.firstName} {emp.lastName}
+            </p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{emp.employeeId || "No ID"}</p>
+          </div>
+        </Link>
+      ),
+    },
+    {
+      header: "Designation & Dept",
+      cell: (emp) => {
+        const deptName = departments.find((d) => d.id === emp.departmentId)?.name || "Corporate";
+        return (
+          <div>
+            <p className="font-medium text-slate-800 leading-tight">{emp.designation}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+              <Building className="h-3 w-3 inline text-slate-400" />
+              {deptName}
+            </p>
+          </div>
+        );
+      },
+    },
+    {
+      header: "Type",
+      className: "text-center",
+      cell: (emp) => getTypeBadge(emp.employmentType),
+    },
+    {
+      header: "Joined Date",
+      className: "text-center",
+      cell: (emp) => (
+        <span className="text-xs text-slate-400 font-medium">
+          {emp.dateOfJoining ? new Date(emp.dateOfJoining).toLocaleDateString() : "N/A"}
+        </span>
+      ),
+    },
+    {
+      header: "Status",
+      className: "text-center",
+      cell: (emp) => getStatusBadge(emp.status),
+    },
+    {
+      header: "Actions",
+      className: "text-center",
+      cell: (emp) => (
+        <div className="flex items-center justify-center gap-1.5">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleOpenEdit(emp)}
+            className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
+          >
+            <Edit2 className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => handleOpenDelete(emp)}
+            className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <div className="p-6 space-y-6 w-full">
       {/* Header and top banner info */}
@@ -736,98 +820,12 @@ export default function EmployeesPage() {
               </div>
             </CardHeader>
             <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50/55 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                      <th className="py-3 px-4">Employee</th>
-                      <th className="py-3 px-4">Designation & Dept</th>
-                      <th className="py-3 px-4 text-center">Type</th>
-                      <th className="py-3 px-4 text-center">Joined Date</th>
-                      <th className="py-3 px-4 text-center">Status</th>
-                      <th className="py-3 px-4 text-center">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-                    {isLoading ? (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-400">
-                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-indigo-500" />
-                          <span className="text-xs mt-2 block font-medium">Fetching directory...</span>
-                        </td>
-                      </tr>
-                    ) : employeesList.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-12 text-center text-slate-400">
-                          <AlertCircle className="h-6 w-6 mx-auto text-slate-300" />
-                          <span className="text-xs mt-2 block font-medium">No employees matching search criteria</span>
-                        </td>
-                      </tr>
-                    ) : (
-                      employeesList.map((emp) => {
-                        const deptName = departments.find((d) => d.id === emp.departmentId)?.name || "Corporate";
-                        return (
-                          <tr key={emp.id} className="hover:bg-slate-50/70 transition-colors">
-                            <td className="py-3.5 px-4">
-                              <Link
-                                href={`/hrms/employees/${emp.id}`}
-                                className="flex items-center gap-3 group/link hover:text-indigo-600 transition-colors"
-                              >
-                                <Avatar size="lg" className="h-9 w-9 rounded-full bg-indigo-50 border border-slate-200 group-hover/link:border-indigo-400 transition-colors">
-                                  <AvatarImage src={emp.avatar} alt={emp.firstName} />
-                                  <AvatarFallback className="text-indigo-700 bg-indigo-50 text-[11px] font-bold">
-                                    {getInitials(emp.firstName, emp.lastName)}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-semibold text-slate-900 leading-tight group-hover/link:underline">
-                                    {emp.firstName} {emp.lastName}
-                                  </p>
-                                  <p className="text-[11px] text-slate-400 mt-0.5">{emp.employeeId || "No ID"}</p>
-                                </div>
-                              </Link>
-                            </td>
-                            <td className="py-3.5 px-4">
-                              <div>
-                                <p className="font-medium text-slate-800 leading-tight">{emp.designation}</p>
-                                <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                                  <Building className="h-3 w-3 inline text-slate-400" />
-                                  {deptName}
-                                </p>
-                              </div>
-                            </td>
-                            <td className="py-3.5 px-4 text-center">{getTypeBadge(emp.employmentType)}</td>
-                            <td className="py-3.5 px-4 text-center text-xs text-slate-400 font-medium">
-                              {emp.dateOfJoining ? new Date(emp.dateOfJoining).toLocaleDateString() : "N/A"}
-                            </td>
-                            <td className="py-3.5 px-4 text-center">{getStatusBadge(emp.status)}</td>
-                            <td className="py-3.5 px-4 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleOpenEdit(emp)}
-                                  className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
-                                >
-                                  <Edit2 className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleOpenDelete(emp)}
-                                  className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md"
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <DataTable
+                data={employeesList}
+                columns={columns}
+                isLoading={isLoading}
+                emptyMessage="No employees matching search criteria"
+              />
             </CardContent>
           </Card>
       </div>
