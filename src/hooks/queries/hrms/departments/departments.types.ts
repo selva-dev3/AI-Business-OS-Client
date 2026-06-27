@@ -1,6 +1,7 @@
 export type Department = {
   id: string;
   name: string;
+  code?: string;
   description?: string;
   parentId?: string;
   parent?: { id: string; name: string };
@@ -20,6 +21,7 @@ export type Department = {
 
 export type CreateDepartmentData = {
   name: string;
+  code?: string;
   description?: string;
   parentId?: string;
   headId?: string;

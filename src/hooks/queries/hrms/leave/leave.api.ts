@@ -8,8 +8,10 @@ import {
   LeaveTypeOption,
   LeaveSearchParams,
   CreateLeaveRequestData,
+  CreateLeaveTypeData,
   ApproveRejectRequestData,
 } from "./leave.types";
+import { Employee, EmployeeListResponse } from "@/hooks/queries/hrms/employees/employees.types";
 
 const BASE_REQUESTS = "/hrms/leave-requests";
 const BASE_BALANCE = "/hrms/leave-balance";
@@ -19,6 +21,13 @@ const BASE_LEAVE_TYPES = "/hrms/leave-types";
 export const leaveApi = {
   getLeaveTypes: () =>
     apiGet<LeaveTypeOption[]>(BASE_LEAVE_TYPES),
+
+  getEmployees: () =>
+    apiGet<EmployeeListResponse>("/hrms/employees"),
+
+  createLeaveType: (data: CreateLeaveTypeData) =>
+    apiPost<LeaveTypeOption>(BASE_LEAVE_TYPES, data),
+
   getAll: (params?: LeaveSearchParams) =>
     apiGet<LeaveListResponse>(`${BASE_REQUESTS}${buildQueryString(params ?? {})}`),
 

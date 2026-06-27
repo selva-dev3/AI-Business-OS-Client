@@ -19,6 +19,7 @@ import {
   TrendingUp,
   MapPin,
   Phone,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,8 @@ import {
   useLeaveTypes,
 } from "@/hooks/queries/hrms/leave/leave.hooks";
 import { LeaveRequest, LeaveBalance, LeaveType, LeaveStatus } from "@/hooks/queries/hrms/leave/leave.types";
+import { Employee } from "@/hooks/queries/hrms/employees/employees.types";
+import { leaveApi } from "@/hooks/queries/hrms/leave/leave.api";
 
 export default function LeavePage() {
   const [activeTab, setActiveTab] = React.useState<"my-requests" | "team-approvals" | "outages">("my-requests");
@@ -65,14 +68,31 @@ export default function LeavePage() {
   const [approvalAction, setApprovalAction] = React.useState<"approve" | "reject">("approve");
   const [managerNotes, setManagerNotes] = React.useState("");
 
+  // Create Leave Type modal state
+  const [isCreateLeaveTypeModalOpen, setIsCreateLeaveTypeModalOpen] = React.useState(false);
+  const [leaveTypeForm, setLeaveTypeForm] = React.useState({
+    name: "",
+    code: "",
+    maxDays: "",
+    description: "",
+    requiresApproval: true,
+  });
+  const [leaveTypeSubmitting, setLeaveTypeSubmitting] = React.useState(false);
+  const [leaveTypeError, setLeaveTypeError] = React.useState<string | null>(null);
+
   // Leave Form values
   const [formValues, setFormValues] = React.useState({
+    employeeId: "",
     leaveTypeId: "",
     fromDate: "",
     toDate: "",
     reason: "",
     emergencyContact: "",
   });
+
+  // Employees list for dropdown
+  const [employees, setEmployees] = React.useState<Employee[]>([]);
+  const [employeesLoading, setEmployeesLoading] = React.useState(false);
 
   // Fetch from Tanstack React Query hooks
   const { data: serverRequests, isLoading, refetch } = useLeaveRequests({
@@ -304,9 +324,10 @@ export default function LeavePage() {
   }, [formValues.fromDate, formValues.toDate]);
 
   // Handle open leave request dialog
-  const handleOpenRequest = () => {
+  const handleOpenRequest = async () => {
     const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
     setFormValues({
+      employeeId: "",
       leaveTypeId: "",
       fromDate: tomorrow,
       toDate: tomorrow,
@@ -314,11 +335,26 @@ export default function LeavePage() {
       emergencyContact: "",
     });
     setIsRequestOpen(true);
+
+    setEmployeesLoading(true);
+    try {
+      const employeesRes = await leaveApi.getEmployees();
+      setEmployees(employeesRes?.data || []);
+    } catch (err) {
+      setEmployees([]);
+    } finally {
+      setEmployeesLoading(false);
+    }
   };
 
   // Submit leave request form
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!formValues.employeeId) {
+      toast.error("Please select an employee");
+      return;
+    }
 
     if (!formValues.leaveTypeId || !formValues.fromDate || !formValues.toDate || !formValues.reason) {
       toast.error("Please fill in all mandatory fields");
@@ -331,6 +367,7 @@ export default function LeavePage() {
     }
 
     const payload = {
+      employeeId: formValues.employeeId,
       leaveTypeId: formValues.leaveTypeId,
       fromDate: new Date(formValues.fromDate).toISOString().split("T")[0],
       toDate: new Date(formValues.toDate).toISOString().split("T")[0],
@@ -476,6 +513,36 @@ export default function LeavePage() {
     }
   };
 
+  // Handle create leave type
+  const handleCreateLeaveType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLeaveTypeError(null);
+
+    if (!leaveTypeForm.name || !leaveTypeForm.code || !leaveTypeForm.maxDays) {
+      setLeaveTypeError("Please fill in all required fields.");
+      return;
+    }
+
+    setLeaveTypeSubmitting(true);
+    try {
+      await leaveApi.createLeaveType({
+        name: leaveTypeForm.name,
+        code: leaveTypeForm.code.toUpperCase(),
+        maxDays: parseInt(leaveTypeForm.maxDays, 10),
+        description: leaveTypeForm.description || undefined,
+        requiresApproval: leaveTypeForm.requiresApproval,
+        isActive: true,
+      });
+      toast.success("Leave type created successfully!");
+      setIsCreateLeaveTypeModalOpen(false);
+      setLeaveTypeForm({ name: "", code: "", maxDays: "", description: "", requiresApproval: true });
+    } catch (err) {
+      setLeaveTypeError(err instanceof Error ? err.message : "Failed to create leave type. Please try again.");
+    } finally {
+      setLeaveTypeSubmitting(false);
+    }
+  };
+
   // Calendar dates details showing away employees (Today or upcoming)
   const calendarEvents = React.useMemo(() => {
     return requestsList.filter((req) => req.status === "approved");
@@ -494,6 +561,18 @@ export default function LeavePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setLeaveTypeForm({ name: "", code: "", maxDays: "", description: "", requiresApproval: true });
+              setLeaveTypeError(null);
+              setIsCreateLeaveTypeModalOpen(true);
+            }}
+            className="flex items-center gap-2 border-slate-200 text-slate-700 hover:bg-slate-50 shadow-sm"
+          >
+            <Plus className="h-4 w-4" />
+            Create Leave Type
+          </Button>
           <Button
             onClick={handleOpenRequest}
             className="flex items-center gap-2 bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
@@ -897,7 +976,13 @@ export default function LeavePage() {
       </div>
 
       {/* Leave Request Dialog Form */}
-      <Dialog open={isRequestOpen} onOpenChange={setIsRequestOpen}>
+      <Dialog open={isRequestOpen} onOpenChange={(open) => {
+        setIsRequestOpen(open);
+        if (!open) {
+          setEmployees([]);
+          setEmployeesLoading(false);
+        }
+      }}>
         <DialogContent className="max-w-md bg-white border border-slate-200 rounded-xl p-6">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-slate-900">
@@ -910,6 +995,33 @@ export default function LeavePage() {
 
           <form onSubmit={handleRequestSubmit} className="space-y-4 py-2">
             
+            {/* Employee selector */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-slate-600">
+                Employee <span className="text-rose-500">*</span>
+              </label>
+              {employeesLoading ? (
+                <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Loading employees...
+                </div>
+              ) : (
+                <select
+                  value={formValues.employeeId}
+                  onChange={(e) => setFormValues({ ...formValues, employeeId: e.target.value })}
+                  className="w-full h-9 px-2 text-sm bg-white rounded-lg border border-slate-200 focus:outline-hidden disabled:opacity-50"
+                  required
+                >
+                  <option value="">Select employee</option>
+                  {employees.map((emp) => (
+                    <option key={emp.id} value={emp.id}>
+                      {emp.firstName} {emp.lastName} — {emp.employeeId}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
             {/* Type selector - API driven */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-600">Leave Category</label>
@@ -1055,6 +1167,137 @@ export default function LeavePage() {
                 )}
               >
                 Confirm {approvalAction === "approve" ? "Approval" : "Rejection"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Leave Type Dialog */}
+      <Dialog
+        open={isCreateLeaveTypeModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsCreateLeaveTypeModalOpen(false);
+            setLeaveTypeForm({ name: "", code: "", maxDays: "", description: "", requiresApproval: true });
+            setLeaveTypeError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md bg-white border border-slate-200 rounded-xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900">
+              Create Leave Type
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              Define a new leave category for the organization.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateLeaveType} className="space-y-4 py-2">
+            {leaveTypeError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs font-semibold text-rose-700">
+                {leaveTypeError}
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Leave Type Name *</label>
+              <Input
+                type="text"
+                placeholder="e.g. Bereavement Leave"
+                value={leaveTypeForm.name}
+                onChange={(e) => setLeaveTypeForm({ ...leaveTypeForm, name: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600">Leave Code *</label>
+                <Input
+                  type="text"
+                  placeholder="e.g. BRV"
+                  value={leaveTypeForm.code}
+                  onChange={(e) => setLeaveTypeForm({ ...leaveTypeForm, code: e.target.value.toUpperCase() })}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600">Max Days / Year *</label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 5"
+                  value={leaveTypeForm.maxDays}
+                  onChange={(e) => setLeaveTypeForm({ ...leaveTypeForm, maxDays: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Description</label>
+              <Textarea
+                placeholder="Optional description for this leave type..."
+                value={leaveTypeForm.description}
+                onChange={(e) => setLeaveTypeForm({ ...leaveTypeForm, description: e.target.value })}
+                className="h-20"
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <div>
+                <label className="text-xs font-semibold text-slate-700">Requires Approval</label>
+                <p className="text-[11px] text-slate-400 mt-0.5">Manager must approve requests for this type</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLeaveTypeForm({ ...leaveTypeForm, requiresApproval: !leaveTypeForm.requiresApproval })}
+                className={cn(
+                  "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                  leaveTypeForm.requiresApproval ? "bg-indigo-600" : "bg-slate-200"
+                )}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
+                    leaveTypeForm.requiresApproval ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsCreateLeaveTypeModalOpen(false);
+                  setLeaveTypeForm({ name: "", code: "", maxDays: "", description: "", requiresApproval: true });
+                  setLeaveTypeError(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={leaveTypeSubmitting}
+                className="bg-indigo-600 text-white hover:bg-indigo-700 font-semibold disabled:opacity-50"
+              >
+                {leaveTypeSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Creating...
+                  </span>
+                ) : (
+                  "Create Leave Type"
+                )}
               </Button>
             </DialogFooter>
           </form>

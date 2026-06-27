@@ -71,11 +71,21 @@ export type LeaveTypeOption = {
 };
 
 export type CreateLeaveRequestData = {
+  employeeId: string;
   leaveTypeId: string;
   fromDate: string;
   toDate: string;
   reason?: string;
   emergencyContact?: string;
+};
+
+export type CreateLeaveTypeData = {
+  name: string;
+  code: string;
+  maxDays: number;
+  description?: string;
+  requiresApproval: boolean;
+  isActive: boolean;
 };
 
 export type ApproveRejectRequestData = {

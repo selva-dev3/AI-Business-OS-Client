@@ -48,6 +48,7 @@ import {
   useDeleteDepartment,
 } from "@/hooks/queries/hrms/departments/departments.hooks";
 import { Department } from "@/hooks/queries/hrms/departments/departments.types";
+import { useEmployees } from "@/hooks/queries/hrms/employees/employees.hooks";
 
 // Mock Employee database for assignments and department heads
 interface TeamMember {
@@ -75,6 +76,7 @@ export default function DepartmentsPage() {
   // Form input states
   const [formValues, setFormValues] = React.useState({
     name: "",
+    code: "",
     description: "",
     parentId: "" as string,
     headId: "" as string,
@@ -85,6 +87,7 @@ export default function DepartmentsPage() {
   const createDeptMutation = useCreateDepartment();
   const updateDeptMutation = useUpdateDepartment();
   const deleteDeptMutation = useDeleteDepartment();
+  const { data: employeesData, isLoading: employeesLoading } = useEmployees();
 
   // Mock static employees list for managers and assignment
   const fallbackEmployees: TeamMember[] = React.useMemo(() => [
@@ -102,14 +105,27 @@ export default function DepartmentsPage() {
 
   const [employees, setEmployees] = React.useState<TeamMember[]>([]);
   React.useEffect(() => {
-    setEmployees(fallbackEmployees);
-  }, [fallbackEmployees]);
+    if (employeesData?.data && employeesData.data.length > 0) {
+      setEmployees(employeesData.data.map((emp) => ({
+        id: emp.id,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        email: emp.email,
+        designation: emp.designation || "",
+        departmentId: emp.departmentId || null,
+        avatar: emp.avatar,
+      })));
+    } else if (!employeesLoading) {
+      setEmployees(fallbackEmployees);
+    }
+  }, [employeesData, employeesLoading, fallbackEmployees]);
 
   // High-fidelity fallback departments database
   const fallbackDepts: Department[] = React.useMemo(() => [
     {
       id: "dept-1",
       name: "Engineering",
+      code: "ENG",
       description: "Software development, QA automation, DevOps infrastructure, and architecture.",
       headId: "emp-1",
       head: { id: "emp-1", firstName: "John", lastName: "Doe", email: "john.doe@company.com" },
@@ -120,6 +136,7 @@ export default function DepartmentsPage() {
     {
       id: "dept-1-1",
       name: "Frontend Team",
+      code: "ENG-FE",
       description: "Client application development, UI layout systems, and rendering optimization.",
       parentId: "dept-1",
       headId: "emp-5",
@@ -131,6 +148,7 @@ export default function DepartmentsPage() {
     {
       id: "dept-1-2",
       name: "DevOps & SRE",
+      code: "ENG-OPS",
       description: "Cloud hosting, CI/CD pipes automation, logging clusters, and deployments.",
       parentId: "dept-1",
       employeeCount: 1,
@@ -140,6 +158,7 @@ export default function DepartmentsPage() {
     {
       id: "dept-2",
       name: "Product & Design",
+      code: "PND",
       description: "Product management specifications, UI/UX prototyping, and user testing surveys.",
       headId: "emp-2",
       head: { id: "emp-2", firstName: "Jane", lastName: "Smith", email: "jane.smith@company.com" },
@@ -150,6 +169,7 @@ export default function DepartmentsPage() {
     {
       id: "dept-3",
       name: "Sales & Marketing",
+      code: "S&M",
       description: "Corporate accounts acquisitions, marketing funnels, and brand campaigns.",
       headId: "emp-4",
       head: { id: "emp-4", firstName: "Emily", lastName: "Watson", email: "emily.watson@company.com" },
@@ -160,6 +180,7 @@ export default function DepartmentsPage() {
     {
       id: "dept-4",
       name: "Human Resources",
+      code: "HR",
       description: "Talent acquisition pipeline, benefits auditing, onboarding, and operations.",
       headId: "emp-3",
       head: { id: "emp-3", firstName: "Robert", lastName: "Chen", email: "robert.chen@company.com" },
@@ -238,6 +259,7 @@ export default function DepartmentsPage() {
     setFormMode("create");
     setFormValues({
       name: "",
+      code: "",
       description: "",
       parentId: "",
       headId: "",
@@ -251,6 +273,7 @@ export default function DepartmentsPage() {
     setSelectedDept(dept);
     setFormValues({
       name: dept.name,
+      code: dept.code || "",
       description: dept.description || "",
       parentId: dept.parentId || "",
       headId: dept.headId || "",
@@ -262,29 +285,32 @@ export default function DepartmentsPage() {
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formValues.name) {
-      toast.error("Please specify a department name");
+    if (!formValues.name.trim()) {
+      toast.error("Department name is required");
       return;
     }
 
+    if (!formValues.code.trim()) {
+      toast.error("Department code is required");
+      return;
+    }
+
+    const payload = {
+      name: formValues.name.trim(),
+      code: formValues.code.trim().toUpperCase(),
+      description: formValues.description.trim() || undefined,
+      parentId: formValues.parentId || undefined,
+      headId: formValues.headId || undefined,
+    };
+
     try {
       if (formMode === "create") {
-        await createDeptMutation.mutateAsync({
-          name: formValues.name,
-          description: formValues.description,
-          parentId: formValues.parentId || undefined,
-          headId: formValues.headId || undefined,
-        });
+        await createDeptMutation.mutateAsync(payload);
         toast.success("Department created successfully");
       } else if (formMode === "edit" && selectedDept) {
         await updateDeptMutation.mutateAsync({
           id: selectedDept.id,
-          data: {
-            name: formValues.name,
-            description: formValues.description,
-            parentId: formValues.parentId || undefined,
-            headId: formValues.headId || undefined,
-          },
+          data: payload,
         });
         toast.success("Department updated successfully");
       }
@@ -299,6 +325,7 @@ export default function DepartmentsPage() {
         const newDept: Department = {
           id: newId,
           name: formValues.name,
+          code: formValues.code.trim().toUpperCase(),
           description: formValues.description,
           parentId: formValues.parentId || undefined,
           headId: formValues.headId || undefined,
@@ -334,6 +361,7 @@ export default function DepartmentsPage() {
             return {
               ...d,
               name: formValues.name,
+              code: formValues.code.trim().toUpperCase(),
               description: formValues.description,
               parentId: formValues.parentId || undefined,
               headId: formValues.headId || undefined,
@@ -837,6 +865,25 @@ export default function DepartmentsPage() {
             </div>
 
             <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">
+                Department Code <span className="text-rose-500">*</span>
+              </label>
+              <Input
+                type="text"
+                placeholder="E.g., ENG, MKT, HR"
+                value={formValues.code}
+                onChange={(e) => setFormValues({
+                  ...formValues,
+                  code: e.target.value.toUpperCase().replace(/\s+/g, '_')
+                })}
+                required
+              />
+              <span className="text-[11px] text-slate-400">
+                Auto-uppercased. E.g. "Engineering" → "ENG"
+              </span>
+            </div>
+
+            <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-600">Nesting Parent Node</label>
               <select
                 value={formValues.parentId}
@@ -860,11 +907,12 @@ export default function DepartmentsPage() {
                 value={formValues.headId}
                 onChange={(e) => setFormValues({ ...formValues, headId: e.target.value })}
                 className="w-full h-9 px-2 text-sm bg-white rounded-lg border border-slate-200 focus:outline-hidden"
+                disabled={employeesLoading}
               >
-                <option value="">Select Department Head</option>
+                <option value="">{employeesLoading ? "Loading employees..." : "Select Department Head"}</option>
                 {employees.map((emp) => (
                   <option key={emp.id} value={emp.id}>
-                    {emp.firstName} {emp.lastName} ({emp.designation})
+                    {emp.firstName} {emp.lastName} — {emp.id}
                   </option>
                 ))}
               </select>
