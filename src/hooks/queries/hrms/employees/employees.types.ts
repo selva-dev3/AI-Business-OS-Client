@@ -25,6 +25,23 @@ export type Employee = {
   employmentType?: "full_time" | "part_time" | "contract" | "intern";
   userId?: string;
   companyId: string;
+  alternatePhone?: string;
+  personalEmail?: string;
+  bloodGroup?: string;
+  maritalStatus?: string;
+  emergencyContact?: {
+    name?: string;
+    relation?: string;
+    phone?: string;
+  };
+  bankDetails?: {
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    accountType?: string;
+  };
+  panNumber?: string;
+  aadharNumber?: string;
   createdAt: string;
   updatedAt: string;
 };

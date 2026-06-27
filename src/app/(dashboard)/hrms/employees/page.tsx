@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Link from "next/link";
 import {
   Dialog,
   DialogContent,
@@ -635,20 +636,23 @@ export default function EmployeesPage() {
                         return (
                           <tr key={emp.id} className="hover:bg-slate-50/70 transition-colors">
                             <td className="py-3.5 px-4">
-                              <div className="flex items-center gap-3">
-                                <Avatar size="lg" className="h-9 w-9 rounded-full bg-indigo-50 border border-slate-200">
+                              <Link
+                                href={`/hrms/employees/${emp.id}`}
+                                className="flex items-center gap-3 group/link hover:text-indigo-600 transition-colors"
+                              >
+                                <Avatar size="lg" className="h-9 w-9 rounded-full bg-indigo-50 border border-slate-200 group-hover/link:border-indigo-400 transition-colors">
                                   <AvatarImage src={emp.avatar} alt={emp.firstName} />
                                   <AvatarFallback className="text-indigo-700 bg-indigo-50 text-[11px] font-bold">
                                     {getInitials(emp.firstName, emp.lastName)}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <p className="font-semibold text-slate-900 leading-tight">
+                                  <p className="font-semibold text-slate-900 leading-tight group-hover/link:underline">
                                     {emp.firstName} {emp.lastName}
                                   </p>
                                   <p className="text-[11px] text-slate-400 mt-0.5">{emp.employeeId || "No ID"}</p>
                                 </div>
-                              </div>
+                              </Link>
                             </td>
                             <td className="py-3.5 px-4">
                               <div>
