@@ -74,6 +74,7 @@ export default function EmployeesPage() {
 
   // Form state
   const [formValues, setFormValues] = React.useState<Partial<Employee>>({
+    employeeCode: "",
     firstName: "",
     lastName: "",
     email: "",
@@ -109,7 +110,12 @@ export default function EmployeesPage() {
 
   const validateField = (name: string, value: any) => {
     let error = "";
-    if (name === "firstName") {
+    if (name === "employeeCode") {
+      const val = (value || "").trim();
+      if (val && val.length > 50) {
+        error = "Employee code must be at most 50 characters";
+      }
+    } else if (name === "firstName") {
       const val = (value || "").trim();
       if (!val) {
         error = "First name is required";
@@ -375,6 +381,7 @@ export default function EmployeesPage() {
     setSubmitError("");
     setEditingEmployee(null);
     setFormValues({
+      employeeCode: "",
       firstName: "",
       lastName: "",
       email: "",
@@ -412,6 +419,7 @@ export default function EmployeesPage() {
     setEditingEmployee(emp);
     setFormValues({
       ...emp,
+      employeeCode: emp.employeeCode || emp.employeeId || "",
       dateOfJoining: emp.dateOfJoining ? emp.dateOfJoining.split("T")[0] : "",
       dateOfBirth: emp.dateOfBirth ? emp.dateOfBirth.split("T")[0] : "",
       bankDetails: emp.bankDetails || {
@@ -441,6 +449,7 @@ export default function EmployeesPage() {
       if (editingEmployee) {
         // Edit flow
         const updateData: UpdateEmployeeData = {
+          employeeCode: formValues.employeeCode || undefined,
           firstName: formValues.firstName,
           lastName: formValues.lastName,
           email: formValues.email,
@@ -457,6 +466,7 @@ export default function EmployeesPage() {
       } else {
         // Add flow
         const createData: CreateEmployeeData = {
+          employeeCode: formValues.employeeCode || undefined,
           firstName: formValues.firstName || "",
           lastName: formValues.lastName || "",
           email: formValues.email || "",
@@ -583,7 +593,7 @@ export default function EmployeesPage() {
             <p className="font-semibold text-slate-900 leading-tight group-hover/link:underline">
               {emp.firstName} {emp.lastName}
             </p>
-            <p className="text-[11px] text-slate-400 mt-0.5">{emp.employeeId || "No ID"}</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">{emp.employeeCode || emp.employeeId || "No ID"}</p>
           </div>
         </Link>
       ),
@@ -906,6 +916,19 @@ export default function EmployeesPage() {
                   />
                   {touched.phone && errors.phone && (
                     <span className="text-xs text-rose-500 mt-1 block">{errors.phone}</span>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Employee Code</label>
+                  <Input
+                    value={formValues.employeeCode || ""}
+                    onChange={(e) => handleChange("employeeCode", e.target.value)}
+                    onBlur={() => handleBlur("employeeCode")}
+                    placeholder="EMP-0001"
+                    className={touched.employeeCode && errors.employeeCode ? "border-rose-500 animate-shake" : ""}
+                  />
+                  {touched.employeeCode && errors.employeeCode && (
+                    <span className="text-xs text-rose-500 mt-1 block">{errors.employeeCode}</span>
                   )}
                 </div>
               </div>

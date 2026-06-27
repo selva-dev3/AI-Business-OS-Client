@@ -1,6 +1,7 @@
 import { Employee } from "@/hooks/queries/hrms/employees/employees.types";
 
 export interface EditForm {
+  employeeCode: string;
   // Contact
   email: string;
   phone: string;

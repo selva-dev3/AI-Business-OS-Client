@@ -71,6 +71,7 @@ const FALLBACK_EMPLOYEES: Employee[] = [
 ];
 
 const EMPTY_FORM: EditForm = {
+  employeeCode: "",
   email: "", phone: "", alternatePhone: "", personalEmail: "",
   dateOfBirth: "", gender: "", bloodGroup: "", maritalStatus: "",
   address: "", city: "", state: "", country: "", zipCode: "",
@@ -125,6 +126,7 @@ export default function EmployeeDetailPage() {
   const syncForm = React.useCallback(() => {
     if (!employee) return;
     setEditForm({
+      employeeCode: employee.employeeCode || employee.employeeId || "",
       email: employee.email || "",
       phone: employee.phone || "",
       alternatePhone: employee.alternatePhone || "",
@@ -158,6 +160,10 @@ export default function EmployeeDetailPage() {
   const getChangedFields = () => {
     if (!employee) return {};
     const patch: Record<string, any> = {};
+
+    const formCode = editForm.employeeCode.trim();
+    const empCode  = employee.employeeCode || employee.employeeId || "";
+    if (formCode !== empCode) patch.employeeCode = formCode || null;
 
     const check = (fk: keyof EditForm, ek: keyof Employee) => {
       const fv = editForm[fk]?.toString().trim() || "";
@@ -216,6 +222,7 @@ export default function EmployeeDetailPage() {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!editForm.email.trim()) errors.push("Work email is required.");
     else if (!emailRegex.test(editForm.email.trim())) errors.push("Invalid work email format.");
+    if (editForm.employeeCode.trim().length > 50) errors.push("Employee Code must be at most 50 characters.");
     const pan = editForm.panNumber.trim().toUpperCase();
     if (pan && !/^[A-Z]{5}[0-9]{4}[A-Z]$/.test(pan)) errors.push("Invalid PAN Card Number format (e.g. ABCDE1234F).");
     const aadhar = editForm.aadharNumber.replace(/\D/g, "");

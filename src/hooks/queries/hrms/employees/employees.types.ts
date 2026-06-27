@@ -3,6 +3,7 @@ import { ListParams, PaginationMeta } from "@/hooks/queries/client";
 export type Employee = {
   id: string;
   employeeId: string;
+  employeeCode?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -52,6 +53,7 @@ export type EmployeeListResponse = {
 };
 
 export type CreateEmployeeData = {
+  employeeCode?: string;
   firstName: string;
   lastName: string;
   email: string;

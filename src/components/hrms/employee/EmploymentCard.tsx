@@ -27,12 +27,22 @@ export function EmploymentCard({
         </div>
       </CardHeader>
       <CardContent className="pt-4 space-y-3.5 text-xs">
-        {/* Employee Code — read-only always */}
+        {/* Employee Code */}
         <div className="flex flex-col gap-1.5">
-          <span className="text-slate-400 font-medium">Employee Code</span>
-          <span className="text-slate-900 font-mono font-bold text-indigo-600">
-            {employee.employeeId || "No ID"}
-          </span>
+          <Label className="text-slate-400 font-medium text-[10px]">Employee Code</Label>
+          {isEditing ? (
+            <input
+              type="text"
+              value={editForm.employeeCode}
+              onChange={(e) => setEditForm({ ...editForm, employeeCode: e.target.value })}
+              className="flex h-8 w-full rounded-md border border-input bg-transparent px-3 py-1 text-xs shadow-sm focus:outline-hidden focus:ring-1 focus:ring-ring text-slate-900 font-semibold"
+              placeholder="EMP-0001"
+            />
+          ) : (
+            <span className="text-slate-900 font-mono font-bold text-indigo-600">
+              {employee.employeeCode || employee.employeeId || "No ID"}
+            </span>
+          )}
         </div>
 
         {/* Reporting Manager */}
