@@ -31,12 +31,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select as UISelect,
+  SelectContent as UISelectContent,
+  SelectItem as UISelectItem,
+  SelectTrigger as UISelectTrigger,
+  SelectValue as UISelectValue,
 } from "@/components/ui/select";
+
+const Select = UISelect as any;
+const SelectContent = UISelectContent as any;
+const SelectItem = UISelectItem as any;
+const SelectTrigger = UISelectTrigger as any;
+const SelectValue = UISelectValue as any;
 import {
   Dialog,
   DialogContent,
