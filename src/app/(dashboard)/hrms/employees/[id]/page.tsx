@@ -21,14 +21,21 @@ import {
   Building2,
   Activity,
   FileText,
-  BadgeAlert
+  BadgeAlert,
+  Eye,
+  EyeOff,
+  ShieldCheck
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useEmployee } from "@/hooks/queries/hrms/employees/employees.hooks";
+import { useEmployee, useUpdateEmployee } from "@/hooks/queries/hrms/employees/employees.hooks";
 import { Employee } from "@/hooks/queries/hrms/employees/employees.types";
+import { toast } from "sonner";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 export default function EmployeeDetailPage() {
   const router = useRouter();
@@ -37,6 +44,27 @@ export default function EmployeeDetailPage() {
 
   // Retrieve employee from API query
   const { data: serverEmployee, isLoading, isError } = useEmployee(id);
+  const updateEmployeeMutation = useUpdateEmployee(id);
+
+  // Tabs navigation state
+  const [activeTab, setActiveTab] = React.useState<"overview" | "financial">("overview");
+
+  // Local fallback mock database for editing
+  const [localEmployee, setLocalEmployee] = React.useState<Employee | null>(null);
+
+  // Edit form state for Financial & Identity
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [showAccountNumber, setShowAccountNumber] = React.useState(false);
+  const [financialForm, setFinancialForm] = React.useState({
+    panNumber: "",
+    aadharNumber: "",
+    accountType: "Savings",
+    bankName: "",
+    accountNumber: "",
+    ifscCode: "",
+  });
+  const [formErrors, setFormErrors] = React.useState<Record<string, string>>({});
+  const [apiError, setApiError] = React.useState<string | null>(null);
 
   // Local fallback mock database for seamless simulation if not on DB yet
   const fallbackEmployees: Employee[] = React.useMemo(() => {
@@ -210,7 +238,132 @@ export default function EmployeeDetailPage() {
     ];
   }, []);
 
-  const employee = serverEmployee || fallbackEmployees.find((emp) => emp.id === id);
+  React.useEffect(() => {
+    if (serverEmployee) {
+      setLocalEmployee(serverEmployee);
+    } else {
+      const found = fallbackEmployees.find((emp) => emp.id === id);
+      if (found) {
+        setLocalEmployee(found);
+      }
+    }
+  }, [serverEmployee, id, fallbackEmployees]);
+
+  const employee = localEmployee || serverEmployee || fallbackEmployees.find((emp) => emp.id === id);
+
+  React.useEffect(() => {
+    if (employee) {
+      setFinancialForm({
+        panNumber: employee.panNumber || "",
+        aadharNumber: employee.aadharNumber || "",
+        accountType: employee.bankDetails?.accountType || "Savings",
+        bankName: employee.bankDetails?.bankName || "",
+        accountNumber: employee.bankDetails?.accountNumber || "",
+        ifscCode: employee.bankDetails?.ifscCode || "",
+      });
+    }
+  }, [employee, isEditing]);
+
+  const formatMaskedAadhar = (val?: string) => {
+    if (!val) return "Not Provided";
+    const clean = val.replace(/\D/g, "");
+    if (clean.length === 12) {
+      return `XXXX XXXX ${clean.slice(-4)}`;
+    }
+    if (val.length > 4) {
+      return `XXXX XXXX ${val.slice(-4)}`;
+    }
+    return val;
+  };
+
+  const maskAccountNumber = (val?: string) => {
+    if (!val) return "Not Provided";
+    if (val.length <= 4) return "••••";
+    return `••••••••${val.slice(-4)}`;
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setFormErrors({});
+    setApiError(null);
+    if (employee) {
+      setFinancialForm({
+        panNumber: employee.panNumber || "",
+        aadharNumber: employee.aadharNumber || "",
+        accountType: employee.bankDetails?.accountType || "Savings",
+        bankName: employee.bankDetails?.bankName || "",
+        accountNumber: employee.bankDetails?.accountNumber || "",
+        ifscCode: employee.bankDetails?.ifscCode || "",
+      });
+    }
+  };
+
+  const handleSaveFinancial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setApiError(null);
+    const errors: Record<string, string> = {};
+
+    const cleanedPan = financialForm.panNumber.trim().toUpperCase();
+    const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]$/;
+    if (cleanedPan && !panRegex.test(cleanedPan)) {
+      errors.panNumber = "Invalid PAN Card Number format (e.g. ABCDE1234F)";
+    }
+
+    const cleanedAadhar = financialForm.aadharNumber.replace(/\D/g, "");
+    if (cleanedAadhar && cleanedAadhar.length !== 12) {
+      errors.aadharNumber = "Aadhar Number must be exactly 12 digits";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      return;
+    }
+
+    setFormErrors({});
+
+    const payload = {
+      panNumber: cleanedPan || undefined,
+      aadharNumber: financialForm.aadharNumber.trim() || undefined,
+      bankDetails: {
+        bankName: financialForm.bankName.trim() || undefined,
+        accountNumber: financialForm.accountNumber.trim() || undefined,
+        ifscCode: financialForm.ifscCode.trim() || undefined,
+        accountType: financialForm.accountType || undefined,
+      }
+    };
+
+    try {
+      await updateEmployeeMutation.mutateAsync(payload);
+      toast.success("Financial & Identity details saved successfully.");
+      setIsEditing(false);
+    } catch (err: any) {
+      console.error(err);
+      const errorMessage = err?.message || err?.response?.data?.message || "Failed to save details on the server.";
+      setApiError(errorMessage);
+
+      if (!serverEmployee) {
+        setLocalEmployee((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            panNumber: cleanedPan,
+            aadharNumber: financialForm.aadharNumber,
+            bankDetails: {
+              bankName: financialForm.bankName,
+              accountNumber: financialForm.accountNumber,
+              ifscCode: financialForm.ifscCode,
+              accountType: financialForm.accountType,
+            }
+          };
+        });
+        toast.info("Saved changes locally (Mock Mode)");
+        setIsEditing(false);
+        setApiError(null);
+      } else {
+        toast.error("Error saving changes. Please try again.");
+      }
+    }
+  };
 
   // Helper to resolve department name
   const getDeptName = () => {
@@ -432,289 +585,522 @@ export default function EmployeeDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Grid of structured detailed info cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        
-        {/* Contact details */}
-        <Card className="border-slate-100 shadow-xs">
-          <CardHeader className="pb-3 border-b border-slate-50">
-            <div className="flex items-center gap-2">
-              <Mail className="h-4.5 w-4.5 text-indigo-600" />
-              <CardTitle className="text-sm font-bold text-slate-800">Contact Channels</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3.5 text-xs">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-slate-400 font-medium">Work Email</span>
-              <span className="text-slate-900 font-semibold select-all">{employee.email || "N/A"}</span>
-            </div>
-            {employee.personalEmail && (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-slate-400 font-medium">Personal Email</span>
-                <span className="text-slate-900 font-semibold select-all">{employee.personalEmail}</span>
-              </div>
+      {/* View switcher & filters row */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
+        {/* Left Tabs Sidebar */}
+        <div className="space-y-2">
+          <Button
+            variant={activeTab === "overview" ? "secondary" : "ghost"}
+            onClick={() => setActiveTab("overview")}
+            className={cn(
+              "w-full justify-start font-semibold text-slate-700",
+              activeTab === "overview" && "bg-indigo-50 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-700"
             )}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-slate-400 font-medium">Mobile Phone</span>
-              <span className="text-slate-900 font-semibold select-all">{employee.phone || "N/A"}</span>
-            </div>
-            {employee.alternatePhone && (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-slate-400 font-medium">Alternate Phone</span>
-                <span className="text-slate-900 font-semibold select-all">{employee.alternatePhone}</span>
-              </div>
+          >
+            <User className="mr-2 h-4 w-4 shrink-0" />
+            Overview
+          </Button>
+          <Button
+            variant={activeTab === "financial" ? "secondary" : "ghost"}
+            onClick={() => setActiveTab("financial")}
+            className={cn(
+              "w-full justify-start font-semibold text-slate-700",
+              activeTab === "financial" && "bg-indigo-50 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-700"
             )}
-          </CardContent>
-        </Card>
+          >
+            <CreditCard className="mr-2 h-4 w-4 shrink-0" />
+            Financial & Identity
+          </Button>
+        </div>
 
-        {/* Personal parameters */}
-        <Card className="border-slate-100 shadow-xs">
-          <CardHeader className="pb-3 border-b border-slate-50">
-            <div className="flex items-center gap-2">
-              <User className="h-4.5 w-4.5 text-indigo-600" />
-              <CardTitle className="text-sm font-bold text-slate-800">Personal Information</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3.5 text-xs">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex flex-col gap-1.5">
-                <span className="text-slate-400 font-medium">Date of Birth</span>
-                <span className="text-slate-900 font-semibold">
-                  {employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : "N/A"}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-slate-400 font-medium">Gender</span>
-                <span className="text-slate-900 font-semibold capitalize">{employee.gender || "N/A"}</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-slate-400 font-medium">Blood Group</span>
-                <span className="text-slate-900 font-semibold uppercase">{employee.bloodGroup || "N/A"}</span>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-slate-400 font-medium">Marital Status</span>
-                <span className="text-slate-900 font-semibold capitalize">{employee.maritalStatus || "N/A"}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Right side content panels */}
+        <div className="lg:col-span-3 space-y-6">
+          {activeTab === "overview" && (
+            <>
+              {/* Grid of structured detailed info cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                
+                {/* Contact details */}
+                <Card className="border-slate-100 shadow-xs">
+                  <CardHeader className="pb-3 border-b border-slate-50">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4.5 w-4.5 text-indigo-600" />
+                      <CardTitle className="text-sm font-bold text-slate-800">Contact Channels</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-3.5 text-xs">
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-slate-400 font-medium">Work Email</span>
+                      <span className="text-slate-900 font-semibold select-all">{employee.email || "N/A"}</span>
+                    </div>
+                    {employee.personalEmail && (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-slate-400 font-medium">Personal Email</span>
+                        <span className="text-slate-900 font-semibold select-all">{employee.personalEmail}</span>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-slate-400 font-medium">Mobile Phone</span>
+                      <span className="text-slate-900 font-semibold select-all">{employee.phone || "N/A"}</span>
+                    </div>
+                    {employee.alternatePhone && (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-slate-400 font-medium">Alternate Phone</span>
+                        <span className="text-slate-900 font-semibold select-all">{employee.alternatePhone}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-        {/* Address card */}
-        <Card className="border-slate-100 shadow-xs">
-          <CardHeader className="pb-3 border-b border-slate-50">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-4.5 w-4.5 text-indigo-600" />
-              <CardTitle className="text-sm font-bold text-slate-800">Primary Address</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3.5 text-xs">
-            {employee.address || employee.city || employee.state ? (
-              <div className="space-y-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-slate-400 font-medium">Street</span>
-                  <span className="text-slate-900 font-semibold leading-relaxed">
-                    {employee.address || "N/A"}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-slate-400 font-medium">City & State</span>
-                    <span className="text-slate-900 font-semibold">
-                      {employee.city || ""}{employee.city && employee.state ? ", " : ""}{employee.state || ""}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-slate-400 font-medium">Country & Zip</span>
-                    <span className="text-slate-900 font-semibold">
-                      {employee.country || "USA"} {employee.zipCode || ""}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-6 text-slate-400 font-medium">
-                No address register recorded.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                {/* Personal parameters */}
+                <Card className="border-slate-100 shadow-xs">
+                  <CardHeader className="pb-3 border-b border-slate-50">
+                    <div className="flex items-center gap-2">
+                      <User className="h-4.5 w-4.5 text-indigo-600" />
+                      <CardTitle className="text-sm font-bold text-slate-800">Personal Information</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-3.5 text-xs">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-slate-400 font-medium">Date of Birth</span>
+                        <span className="text-slate-900 font-semibold">
+                          {employee.dateOfBirth ? new Date(employee.dateOfBirth).toLocaleDateString() : "N/A"}
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-slate-400 font-medium">Gender</span>
+                        <span className="text-slate-900 font-semibold capitalize">{employee.gender || "N/A"}</span>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-slate-400 font-medium">Blood Group</span>
+                        <span className="text-slate-900 font-semibold uppercase">{employee.bloodGroup || "N/A"}</span>
+                      </div>
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-slate-400 font-medium">Marital Status</span>
+                        <span className="text-slate-900 font-semibold capitalize">{employee.maritalStatus || "N/A"}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-        {/* Professional Profile */}
-        <Card className="border-slate-100 shadow-xs">
-          <CardHeader className="pb-3 border-b border-slate-50">
-            <div className="flex items-center gap-2">
-              <Activity className="h-4.5 w-4.5 text-indigo-600" />
-              <CardTitle className="text-sm font-bold text-slate-800">Employment Overview</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3.5 text-xs">
-            <div className="flex flex-col gap-1.5">
-              <span className="text-slate-400 font-medium">Employee Code</span>
-              <span className="text-slate-900 font-mono font-bold text-indigo-600">
-                {employee.employeeId || "No ID"}
-              </span>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <span className="text-slate-400 font-medium">Reporting Manager</span>
-              <span className="text-slate-900 font-semibold">
-                {employee.manager ? `${employee.manager.firstName} ${employee.manager.lastName}` : "No direct reporting manager"}
-              </span>
-            </div>
-            {employee.createdAt && (
-              <div className="flex flex-col gap-1.5">
-                <span className="text-slate-400 font-medium">Profile Registered</span>
-                <span className="text-slate-900 font-semibold">
-                  {new Date(employee.createdAt).toLocaleString()}
-                </span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                {/* Address card */}
+                <Card className="border-slate-100 shadow-xs">
+                  <CardHeader className="pb-3 border-b border-slate-50">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4.5 w-4.5 text-indigo-600" />
+                      <CardTitle className="text-sm font-bold text-slate-800">Primary Address</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-3.5 text-xs">
+                    {employee.address || employee.city || employee.state ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-slate-400 font-medium">Street</span>
+                          <span className="text-slate-900 font-semibold leading-relaxed">
+                            {employee.address || "N/A"}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-400 font-medium">City & State</span>
+                            <span className="text-slate-900 font-semibold">
+                              {employee.city || ""}{employee.city && employee.state ? ", " : ""}{employee.state || ""}
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-400 font-medium">Country & Zip</span>
+                            <span className="text-slate-900 font-semibold">
+                              {employee.country || "USA"} {employee.zipCode || ""}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-slate-400 font-medium">
+                        No address register recorded.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
 
-        {/* Financial bank details */}
-        <Card className="border-slate-100 shadow-xs">
-          <CardHeader className="pb-3 border-b border-slate-50">
-            <div className="flex items-center gap-2">
-              <CreditCard className="h-4.5 w-4.5 text-indigo-600" />
-              <CardTitle className="text-sm font-bold text-slate-800">Bank Account Details</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3.5 text-xs">
-            {employee.bankDetails ? (
-              <div className="space-y-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-slate-400 font-medium">Bank Name</span>
-                  <span className="text-slate-900 font-bold">{employee.bankDetails.bankName || "N/A"}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-slate-400 font-medium">Account Number</span>
-                    <span className="text-slate-900 font-mono font-semibold">{employee.bankDetails.accountNumber || "N/A"}</span>
+                {/* Professional Profile */}
+                <Card className="border-slate-100 shadow-xs">
+                  <CardHeader className="pb-3 border-b border-slate-50">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4.5 w-4.5 text-indigo-600" />
+                      <CardTitle className="text-sm font-bold text-slate-800">Employment Overview</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-3.5 text-xs">
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-slate-400 font-medium">Employee Code</span>
+                      <span className="text-slate-900 font-mono font-bold text-indigo-600">
+                        {employee.employeeId || "No ID"}
+                      </span>
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                      <span className="text-slate-400 font-medium">Reporting Manager</span>
+                      <span className="text-slate-900 font-semibold">
+                        {employee.manager ? `${employee.manager.firstName} ${employee.manager.lastName}` : "No direct reporting manager"}
+                      </span>
+                    </div>
+                    {employee.createdAt && (
+                      <div className="flex flex-col gap-1.5">
+                        <span className="text-slate-400 font-medium">Profile Registered</span>
+                        <span className="text-slate-900 font-semibold">
+                          {new Date(employee.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Financial bank details */}
+                <Card className="border-slate-100 shadow-xs">
+                  <CardHeader className="pb-3 border-b border-slate-50">
+                    <div className="flex items-center gap-2">
+                      <CreditCard className="h-4.5 w-4.5 text-indigo-600" />
+                      <CardTitle className="text-sm font-bold text-slate-800">Bank Account Details</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-3.5 text-xs">
+                    {employee.bankDetails ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-slate-400 font-medium">Bank Name</span>
+                          <span className="text-slate-900 font-bold">{employee.bankDetails.bankName || "N/A"}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-400 font-medium">Account Number</span>
+                            <span className="text-slate-900 font-mono font-semibold">{employee.bankDetails.accountNumber || "N/A"}</span>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-400 font-medium">IFSC Code</span>
+                            <span className="text-slate-900 font-mono font-semibold uppercase">{employee.bankDetails.ifscCode || "N/A"}</span>
+                          </div>
+                        </div>
+                        {employee.bankDetails.accountType && (
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-400 font-medium">Account Type</span>
+                            <span className="text-slate-900 font-semibold capitalize">{employee.bankDetails.accountType}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-slate-400 font-medium">
+                        No bank accounts linked to profile.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Emergency contact */}
+                <Card className="border-slate-100 shadow-xs">
+                  <CardHeader className="pb-3 border-b border-slate-50">
+                    <div className="flex items-center gap-2">
+                      <HeartPulse className="h-4.5 w-4.5 text-indigo-600" />
+                      <CardTitle className="text-sm font-bold text-slate-800">Emergency Contact</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4 space-y-3.5 text-xs">
+                    {employee.emergencyContact ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-slate-400 font-medium">Primary Nominee</span>
+                          <span className="text-slate-900 font-semibold">{employee.emergencyContact.name || "N/A"}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-400 font-medium">Relationship</span>
+                            <span className="text-slate-900 font-semibold capitalize">{employee.emergencyContact.relation || "N/A"}</span>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-400 font-medium">Phone Number</span>
+                            <span className="text-slate-900 font-semibold select-all">{employee.emergencyContact.phone || "N/A"}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-slate-400 font-medium">
+                        No emergency details specified.
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Statutory details (PAN / Aadhar) if present */}
+              {(employee.panNumber || employee.aadharNumber) && (
+                <Card className="border-slate-100 shadow-xs max-w-2xl">
+                  <CardHeader className="pb-3 border-b border-slate-50">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4.5 w-4.5 text-indigo-600" />
+                      <CardTitle className="text-sm font-bold text-slate-800">Statutory Identification</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-4 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {employee.panNumber && (
+                        <div className="flex flex-col gap-1.5 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-100">
+                          <span className="text-slate-400 font-medium">PAN Card Number</span>
+                          <span className="text-slate-900 font-mono font-bold select-all tracking-wider uppercase">
+                            {employee.panNumber}
+                          </span>
+                        </div>
+                      )}
+                      {employee.aadharNumber && (
+                        <div className="flex flex-col gap-1.5 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-100">
+                          <span className="text-slate-400 font-medium">Aadhar Identity Number</span>
+                          <span className="text-slate-900 font-mono font-bold select-all tracking-wider">
+                            {formatMaskedAadhar(employee.aadharNumber)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* All Response Data Section (Inspector Mode) - HIDES ALL IDs */}
+              <Card className="border-indigo-100/60 bg-indigo-50/10 shadow-sm">
+                <CardHeader className="pb-3 border-b border-indigo-100/30">
+                  <div className="flex items-center gap-2 text-indigo-950 dark:text-indigo-200">
+                    <BadgeAlert className="h-4.5 w-4.5 text-indigo-600" />
+                    <div>
+                      <CardTitle className="text-sm font-bold">Comprehensive Attributes Inspector</CardTitle>
+                      <CardDescription className="text-[11px] text-slate-400 mt-0.5">
+                        Dynamic visualization of all response parameters. Database ID strings are strictly hidden.
+                      </CardDescription>
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-slate-400 font-medium">IFSC Code</span>
-                    <span className="text-slate-900 font-mono font-semibold uppercase">{employee.bankDetails.ifscCode || "N/A"}</span>
-                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  {allProperties.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                      {allProperties.map((field, idx) => (
+                        <div
+                          key={idx}
+                          className="p-3 bg-white dark:bg-slate-900 border border-slate-100 rounded-lg flex flex-col gap-1 shadow-2xs hover:border-indigo-200/50 transition-colors"
+                        >
+                          <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
+                            {field.label}
+                          </span>
+                          <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 break-all select-all leading-normal">
+                            {field.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 text-slate-400 text-xs">
+                      No extra fields to show in response inspector.
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {activeTab === "financial" && (
+            <Card className="border-slate-200 bg-white shadow-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b border-slate-150">
+                <div>
+                  <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <ShieldCheck className="h-5 w-5 text-indigo-600" />
+                    Financial & Identity Parameters
+                  </CardTitle>
+                  <CardDescription className="text-xs text-slate-450 mt-1">
+                    Manage payroll bank accounts, PAN card, and identity documents.
+                  </CardDescription>
                 </div>
-                {employee.bankDetails.accountType && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-slate-400 font-medium">Account Type</span>
-                    <span className="text-slate-900 font-semibold capitalize">{employee.bankDetails.accountType}</span>
+                {!isEditing && (
+                  <Button
+                    onClick={() => setIsEditing(true)}
+                    variant="outline"
+                    className="border-slate-200 text-slate-650 hover:text-indigo-600 hover:bg-indigo-50/50 hover:border-indigo-200 transition-all rounded-lg font-semibold"
+                  >
+                    Edit
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="pt-6">
+                {apiError && (
+                  <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-md text-xs text-rose-600 font-semibold flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-rose-500" />
+                    <span>{apiError}</span>
                   </div>
                 )}
-              </div>
-            ) : (
-              <div className="text-center py-6 text-slate-400 font-medium">
-                No bank accounts linked to profile.
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
-        {/* Emergency contact */}
-        <Card className="border-slate-100 shadow-xs">
-          <CardHeader className="pb-3 border-b border-slate-50">
-            <div className="flex items-center gap-2">
-              <HeartPulse className="h-4.5 w-4.5 text-indigo-600" />
-              <CardTitle className="text-sm font-bold text-slate-800">Emergency Contact</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 space-y-3.5 text-xs">
-            {employee.emergencyContact ? (
-              <div className="space-y-3">
-                <div className="flex flex-col gap-1">
-                  <span className="text-slate-400 font-medium">Primary Nominee</span>
-                  <span className="text-slate-900 font-semibold">{employee.emergencyContact.name || "N/A"}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-slate-400 font-medium">Relationship</span>
-                    <span className="text-slate-900 font-semibold capitalize">{employee.emergencyContact.relation || "N/A"}</span>
+                <form onSubmit={handleSaveFinancial} className="space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {/* PAN Card Number */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-600">PAN Card Number</Label>
+                      {isEditing ? (
+                        <div>
+                          <Input
+                            value={financialForm.panNumber}
+                            onChange={(e) => setFinancialForm({ ...financialForm, panNumber: e.target.value })}
+                            placeholder="e.g. ABCDE1234F"
+                            className={formErrors.panNumber ? "border-rose-500 focus:ring-rose-500" : ""}
+                          />
+                          {formErrors.panNumber && (
+                            <span className="text-[11px] text-rose-500 mt-1 block font-medium">{formErrors.panNumber}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-100 text-slate-900 font-mono font-bold text-xs uppercase tracking-wider">
+                          {employee.panNumber || "Not Provided"}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Aadhar Number */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-600">Aadhar Identity Number</Label>
+                      {isEditing ? (
+                        <div>
+                          <Input
+                            value={financialForm.aadharNumber}
+                            onChange={(e) => setFinancialForm({ ...financialForm, aadharNumber: e.target.value })}
+                            placeholder="12-digit Aadhar number"
+                            className={formErrors.aadharNumber ? "border-rose-500 focus:ring-rose-500" : ""}
+                          />
+                          {formErrors.aadharNumber && (
+                            <span className="text-[11px] text-rose-500 mt-1 block font-medium">{formErrors.aadharNumber}</span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-100 text-slate-900 font-mono font-bold text-xs tracking-wider">
+                          {formatMaskedAadhar(employee.aadharNumber)}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Account Type */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-600">Account Type</Label>
+                      {isEditing ? (
+                        <select
+                          value={financialForm.accountType}
+                          onChange={(e) => setFinancialForm({ ...financialForm, accountType: e.target.value })}
+                          className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden focus:ring-1 focus:ring-ring text-xs text-slate-900 font-semibold"
+                        >
+                          <option value="Savings">Savings</option>
+                          <option value="Current">Current</option>
+                          <option value="Salary">Salary</option>
+                        </select>
+                      ) : (
+                        <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-100 text-slate-900 font-bold text-xs capitalize">
+                          {employee.bankDetails?.accountType || "Not Provided"}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Bank Name */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-600">Bank Name</Label>
+                      {isEditing ? (
+                        <Input
+                          value={financialForm.bankName}
+                          onChange={(e) => setFinancialForm({ ...financialForm, bankName: e.target.value })}
+                          placeholder="Bank Name"
+                        />
+                      ) : (
+                        <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-100 text-slate-900 font-bold text-xs">
+                          {employee.bankDetails?.bankName || "Not Provided"}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Account Number */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-600">Account Number</Label>
+                      {isEditing ? (
+                        <div className="relative">
+                          <Input
+                            type={showAccountNumber ? "text" : "password"}
+                            value={financialForm.accountNumber}
+                            onChange={(e) => setFinancialForm({ ...financialForm, accountNumber: e.target.value })}
+                            placeholder="Account Number"
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAccountNumber(!showAccountNumber)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          >
+                            {showAccountNumber ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-100 text-slate-900 font-mono font-bold text-xs flex items-center justify-between">
+                          <span>
+                            {showAccountNumber
+                              ? (employee.bankDetails?.accountNumber || "Not Provided")
+                              : maskAccountNumber(employee.bankDetails?.accountNumber)}
+                          </span>
+                          {employee.bankDetails?.accountNumber && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAccountNumber(!showAccountNumber)}
+                              className="text-slate-400 hover:text-indigo-650 transition-colors"
+                            >
+                              {showAccountNumber ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* IFSC / Routing Code */}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs font-bold text-slate-600">IFSC / Routing Code</Label>
+                      {isEditing ? (
+                        <Input
+                          value={financialForm.ifscCode}
+                          onChange={(e) => setFinancialForm({ ...financialForm, ifscCode: e.target.value })}
+                          placeholder="e.g. SBIN0001234"
+                        />
+                      ) : (
+                        <div className="p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-100 text-slate-900 font-mono font-bold text-xs uppercase tracking-wider">
+                          {employee.bankDetails?.ifscCode || "Not Provided"}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-slate-400 font-medium">Phone Number</span>
-                    <span className="text-slate-900 font-semibold select-all">{employee.emergencyContact.phone || "N/A"}</span>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-6 text-slate-400 font-medium">
-                No emergency details specified.
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Statutory details (PAN / Aadhar) if present */}
-      {(employee.panNumber || employee.aadharNumber) && (
-        <Card className="border-slate-100 shadow-xs max-w-2xl">
-          <CardHeader className="pb-3 border-b border-slate-50">
-            <div className="flex items-center gap-2">
-              <FileText className="h-4.5 w-4.5 text-indigo-600" />
-              <CardTitle className="text-sm font-bold text-slate-800">Statutory Identification</CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent className="pt-4 text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {employee.panNumber && (
-                <div className="flex flex-col gap-1.5 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-100">
-                  <span className="text-slate-400 font-medium">PAN Card Number</span>
-                  <span className="text-slate-900 font-mono font-bold select-all tracking-wider uppercase">
-                    {employee.panNumber}
-                  </span>
-                </div>
-              )}
-              {employee.aadharNumber && (
-                <div className="flex flex-col gap-1.5 p-3 bg-slate-50 dark:bg-slate-900/40 rounded-lg border border-slate-100">
-                  <span className="text-slate-400 font-medium">Aadhar Identity Number</span>
-                  <span className="text-slate-900 font-mono font-bold select-all tracking-wider">
-                    {employee.aadharNumber}
-                  </span>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* All Response Data Section (Inspector Mode) - HIDES ALL IDs */}
-      <Card className="border-indigo-100/60 bg-indigo-50/10 shadow-sm">
-        <CardHeader className="pb-3 border-b border-indigo-100/30">
-          <div className="flex items-center gap-2 text-indigo-950 dark:text-indigo-200">
-            <BadgeAlert className="h-4.5 w-4.5 text-indigo-600" />
-            <div>
-              <CardTitle className="text-sm font-bold">Comprehensive Attributes Inspector</CardTitle>
-              <CardDescription className="text-[11px] text-slate-400 mt-0.5">
-                Dynamic visualization of all response parameters. Database ID strings are strictly hidden.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4">
-          {allProperties.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {allProperties.map((field, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 bg-white dark:bg-slate-900 border border-slate-100 rounded-lg flex flex-col gap-1 shadow-2xs hover:border-indigo-200/50 transition-colors"
-                >
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                    {field.label}
-                  </span>
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200 break-all select-all leading-normal">
-                    {field.value}
-                  </span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-6 text-slate-400 text-xs">
-              No extra fields to show in response inspector.
-            </div>
+                  {isEditing && (
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancelEdit}
+                        disabled={updateEmployeeMutation.isPending}
+                        className="border-slate-200 text-slate-600 font-semibold"
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={updateEmployeeMutation.isPending}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex items-center gap-2"
+                      >
+                        {updateEmployeeMutation.isPending && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
+                        Save Changes
+                      </Button>
+                    </div>
+                  )}
+                </form>
+              </CardContent>
+            </Card>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </div>
   );
 }
