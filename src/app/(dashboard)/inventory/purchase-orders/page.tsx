@@ -32,18 +32,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select as UISelect,
-  SelectContent as UISelectContent,
-  SelectItem as UISelectItem,
-  SelectTrigger as UISelectTrigger,
-  SelectValue as UISelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 
-const Select = UISelect as any;
-const SelectContent = UISelectContent as any;
-const SelectItem = UISelectItem as any;
-const SelectTrigger = UISelectTrigger as any;
-const SelectValue = UISelectValue as any;
 
 // Extend PurchaseOrder locally to include warehouse destination field
 export interface InventoryPurchaseOrder extends PurchaseOrder {

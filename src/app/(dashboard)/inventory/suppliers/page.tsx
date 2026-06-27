@@ -29,18 +29,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select as UISelect,
-  SelectContent as UISelectContent,
-  SelectItem as UISelectItem,
-  SelectTrigger as UISelectTrigger,
-  SelectValue as UISelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-
-const Select = UISelect as any;
-const SelectContent = UISelectContent as any;
-const SelectItem = UISelectItem as any;
-const SelectTrigger = UISelectTrigger as any;
-const SelectValue = UISelectValue as any;
 
 export interface Supplier {
   id: string;
@@ -451,7 +445,7 @@ export default function SuppliersPage() {
 
             <div className="space-y-1.5">
               <Label className="text-[12px] font-semibold text-slate-600">Supplier Status</Label>
-              <Select value={status} onValueChange={setStatus}>
+              <Select value={status} onValueChange={(val: string) => setStatus(val as "active" | "inactive")}>
                 <SelectTrigger className="w-full bg-white border-slate-200">
                   <SelectValue placeholder="Select Status" />
                 </SelectTrigger>

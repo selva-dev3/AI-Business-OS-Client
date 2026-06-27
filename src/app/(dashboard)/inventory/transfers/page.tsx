@@ -44,19 +44,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Select as UISelect,
-  SelectContent as UISelectContent,
-  SelectItem as UISelectItem,
-  SelectTrigger as UISelectTrigger,
-  SelectValue as UISelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-
-const Select = UISelect as any;
-const SelectContent = UISelectContent as any;
-const SelectItem = UISelectItem as any;
-const SelectTrigger = UISelectTrigger as any;
-const SelectValue = UISelectValue as any;
 
 const localTransfers: StockTransfer[] = [
   {
