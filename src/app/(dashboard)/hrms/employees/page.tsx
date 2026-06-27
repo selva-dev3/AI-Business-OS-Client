@@ -91,6 +91,14 @@ export default function EmployeesPage() {
     state: "",
     country: "USA",
     zipCode: "",
+    bankDetails: {
+      bankName: "",
+      accountNumber: "",
+      ifscCode: "",
+      accountType: "savings",
+    },
+    panNumber: "",
+    aadharNumber: "",
   });
 
   // Bulk import state
@@ -282,6 +290,14 @@ export default function EmployeesPage() {
       state: "",
       country: "USA",
       zipCode: "",
+      bankDetails: {
+        bankName: "",
+        accountNumber: "",
+        ifscCode: "",
+        accountType: "savings",
+      },
+      panNumber: "",
+      aadharNumber: "",
     });
     setIsAddEditOpen(true);
   };
@@ -293,6 +309,14 @@ export default function EmployeesPage() {
       ...emp,
       dateOfJoining: emp.dateOfJoining ? emp.dateOfJoining.split("T")[0] : "",
       dateOfBirth: emp.dateOfBirth ? emp.dateOfBirth.split("T")[0] : "",
+      bankDetails: emp.bankDetails || {
+        bankName: "",
+        accountNumber: "",
+        ifscCode: "",
+        accountType: "savings",
+      },
+      panNumber: emp.panNumber || "",
+      aadharNumber: emp.aadharNumber || "",
     });
     setIsAddEditOpen(true);
   };
@@ -333,6 +357,9 @@ export default function EmployeesPage() {
           country: formValues.country,
           zipCode: formValues.zipCode,
           employmentType: formValues.employmentType as any,
+          bankDetails: formValues.bankDetails,
+          panNumber: formValues.panNumber,
+          aadharNumber: formValues.aadharNumber,
         };
         await createMutation.mutateAsync(createData);
         toast.success("New employee added successfully");
@@ -949,6 +976,98 @@ export default function EmployeesPage() {
                     onChange={(e) => setFormValues({ ...formValues, zipCode: e.target.value })}
                     placeholder="10001"
                   />
+                </div>
+              </div>
+            </div>
+
+            {/* Financial & Identity Details */}
+            <div className="border-t border-slate-100 pt-4 space-y-4">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Financial & Identity details</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">PAN Card Number</label>
+                  <Input
+                    value={formValues.panNumber || ""}
+                    onChange={(e) => setFormValues({ ...formValues, panNumber: e.target.value })}
+                    placeholder="ABCDE1234F"
+                    className="font-mono uppercase text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Aadhar Number</label>
+                  <Input
+                    value={formValues.aadharNumber || ""}
+                    onChange={(e) => setFormValues({ ...formValues, aadharNumber: e.target.value })}
+                    placeholder="1234 5678 9012"
+                    className="text-xs"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Bank Name</label>
+                  <Input
+                    value={formValues.bankDetails?.bankName || ""}
+                    onChange={(e) => setFormValues({
+                      ...formValues,
+                      bankDetails: {
+                        ...(formValues.bankDetails || {}),
+                        bankName: e.target.value
+                      }
+                    })}
+                    placeholder="Chase Bank"
+                    className="text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Account Number</label>
+                  <Input
+                    value={formValues.bankDetails?.accountNumber || ""}
+                    onChange={(e) => setFormValues({
+                      ...formValues,
+                      bankDetails: {
+                        ...(formValues.bankDetails || {}),
+                        accountNumber: e.target.value
+                      }
+                    })}
+                    placeholder="1234567890"
+                    className="text-xs"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">IFSC / Routing Code</label>
+                  <Input
+                    value={formValues.bankDetails?.ifscCode || ""}
+                    onChange={(e) => setFormValues({
+                      ...formValues,
+                      bankDetails: {
+                        ...(formValues.bankDetails || {}),
+                        ifscCode: e.target.value
+                      }
+                    })}
+                    placeholder="CHAS0123456"
+                    className="font-mono uppercase text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Account Type</label>
+                  <select
+                    value={formValues.bankDetails?.accountType || "savings"}
+                    onChange={(e) => setFormValues({
+                      ...formValues,
+                      bankDetails: {
+                        ...(formValues.bankDetails || {}),
+                        accountType: e.target.value
+                      }
+                    })}
+                    className="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus:outline-hidden text-xs"
+                  >
+                    <option value="savings">Savings Account</option>
+                    <option value="checking">Checking / Current Account</option>
+                    <option value="salary">Salary Account</option>
+                  </select>
                 </div>
               </div>
             </div>

@@ -68,6 +68,14 @@ export type CreateEmployeeData = {
   country?: string;
   zipCode?: string;
   employmentType?: "full_time" | "part_time" | "contract" | "intern";
+  bankDetails?: {
+    bankName?: string;
+    accountNumber?: string;
+    ifscCode?: string;
+    accountType?: string;
+  };
+  panNumber?: string;
+  aadharNumber?: string;
 };
 
 export type UpdateEmployeeData = Partial<CreateEmployeeData> & {
