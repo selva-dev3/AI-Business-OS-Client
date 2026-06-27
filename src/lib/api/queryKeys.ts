@@ -84,6 +84,20 @@ export const queryKeys = {
     list: (params?: unknown) => ["expenses", "list", params] as const,
     detail: (id: string) => ["expenses", "detail", id] as const,
   },
+  payments: {
+    all: ["payments"] as const,
+    list: (params?: unknown) => ["payments", "list", params] as const,
+    detail: (id: string) => ["payments", "detail", id] as const,
+  },
+  budgets: {
+    all: ["budgets"] as const,
+    list: (params?: unknown) => ["budgets", "list", params] as const,
+  },
+  financeAccounts: {
+    all: ["financeAccounts"] as const,
+    list: (params?: unknown) => ["financeAccounts", "list", params] as const,
+    detail: (id: string) => ["financeAccounts", "detail", id] as const,
+  },
   projects: {
     all: ["projects"] as const,
     list: (params?: unknown) => ["projects", "list", params] as const,
