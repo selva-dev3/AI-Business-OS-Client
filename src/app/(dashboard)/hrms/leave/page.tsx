@@ -46,6 +46,7 @@ import {
   useApproveLeave,
   useRejectLeave,
   useCancelLeave,
+  useLeaveTypes,
 } from "@/hooks/queries/hrms/leave/leave.hooks";
 import { LeaveRequest, LeaveBalance, LeaveType, LeaveStatus } from "@/hooks/queries/hrms/leave/leave.types";
 
@@ -66,11 +67,11 @@ export default function LeavePage() {
 
   // Leave Form values
   const [formValues, setFormValues] = React.useState({
-    leaveType: "annual" as LeaveType,
-    startDate: "",
-    endDate: "",
+    leaveTypeId: "",
+    fromDate: "",
+    toDate: "",
     reason: "",
-    contactNumber: "",
+    emergencyContact: "",
   });
 
   // Fetch from Tanstack React Query hooks
@@ -86,6 +87,8 @@ export default function LeavePage() {
   const approveMutation = useApproveLeave();
   const rejectMutation = useApproveLeave(); // Wrapped internally or mocked
   const cancelMutation = useCancelLeave();
+
+  const { data: leaveTypes, isLoading: isLoadingLeaveTypes, isError: isLeaveTypesError } = useLeaveTypes();
 
   // Static departments mapping
   const departments = [
@@ -289,25 +292,26 @@ export default function LeavePage() {
 
   // Auto calculate total days in request dialog
   const calculatedDays = React.useMemo(() => {
-    if (!formValues.startDate || !formValues.endDate) return 0;
-    const start = new Date(formValues.startDate);
-    const end = new Date(formValues.endDate);
+    if (!formValues.fromDate || !formValues.toDate) return 0;
+    const start = new Date(formValues.fromDate);
+    const end = new Date(formValues.toDate);
     if (end < start) return 0;
     
     const diffTime = Math.abs(end.getTime() - start.getTime());
     // Add 1 to make it inclusive
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     return diffDays;
-  }, [formValues.startDate, formValues.endDate]);
+  }, [formValues.fromDate, formValues.toDate]);
 
   // Handle open leave request dialog
   const handleOpenRequest = () => {
+    const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
     setFormValues({
-      leaveType: "annual",
-      startDate: new Date(Date.now() + 86400000).toISOString().split("T")[0], // Tomorrow
-      endDate: new Date(Date.now() + 86400000).toISOString().split("T")[0],
+      leaveTypeId: "",
+      fromDate: tomorrow,
+      toDate: tomorrow,
       reason: "",
-      contactNumber: "",
+      emergencyContact: "",
     });
     setIsRequestOpen(true);
   };
@@ -316,32 +320,39 @@ export default function LeavePage() {
   const handleRequestSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formValues.startDate || !formValues.endDate || !formValues.reason) {
+    if (!formValues.leaveTypeId || !formValues.fromDate || !formValues.toDate || !formValues.reason) {
       toast.error("Please fill in all mandatory fields");
       return;
     }
 
-    if (new Date(formValues.endDate) < new Date(formValues.startDate)) {
+    if (new Date(formValues.toDate) < new Date(formValues.fromDate)) {
       toast.error("End date cannot be prior to start date");
       return;
     }
 
+    const payload = {
+      leaveTypeId: formValues.leaveTypeId,
+      fromDate: new Date(formValues.fromDate).toISOString().split("T")[0],
+      toDate: new Date(formValues.toDate).toISOString().split("T")[0],
+      reason: formValues.reason,
+      emergencyContact: formValues.emergencyContact || undefined,
+    };
+
     try {
-      await createRequestMutation.mutateAsync(formValues);
+      await createRequestMutation.mutateAsync(payload);
       toast.success("Leave request submitted successfully!");
       setIsRequestOpen(false);
       refetch();
     } catch (err) {
-      // Mock local submission
       const newRequest: LeaveRequest = {
         id: `my-${Date.now()}`,
         employeeId: "current-user",
-        leaveType: formValues.leaveType,
-        startDate: formValues.startDate,
-        endDate: formValues.endDate,
+        leaveType: "annual",
+        startDate: payload.fromDate,
+        endDate: payload.toDate,
         totalDays: calculatedDays,
-        reason: formValues.reason,
-        contactNumber: formValues.contactNumber,
+        reason: payload.reason || "",
+        contactNumber: payload.emergencyContact,
         status: "pending",
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -349,9 +360,8 @@ export default function LeavePage() {
 
       setLocalMyRequests([newRequest, ...localMyRequests]);
 
-      // Deduct pending balance for UI visual response
       const updatedBalances = localBalances.map((bal) => {
-        if (bal.leaveType === formValues.leaveType) {
+        if (bal.leaveType === "annual") {
           return {
             ...bal,
             pending: bal.pending + calculatedDays,
@@ -900,38 +910,48 @@ export default function LeavePage() {
 
           <form onSubmit={handleRequestSubmit} className="space-y-4 py-2">
             
-            {/* Type selector */}
+            {/* Type selector - API driven */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-slate-600">Leave Category</label>
               <select
-                value={formValues.leaveType}
-                onChange={(e) => setFormValues({ ...formValues, leaveType: e.target.value as LeaveType })}
-                className="w-full h-9 px-2 text-sm bg-white rounded-lg border border-slate-200 focus:outline-hidden"
+                value={formValues.leaveTypeId}
+                onChange={(e) => setFormValues({ ...formValues, leaveTypeId: e.target.value })}
+                disabled={isLoadingLeaveTypes}
+                className="w-full h-9 px-2 text-sm bg-white rounded-lg border border-slate-200 focus:outline-hidden disabled:opacity-50"
+                required
               >
-                <option value="annual">Annual Leave</option>
-                <option value="sick">Sick Leave</option>
-                <option value="casual">Casual Leave</option>
-                <option value="unpaid">Unpaid Leave</option>
+                {isLoadingLeaveTypes && (
+                  <option value="" disabled>Loading leave types...</option>
+                )}
+                {isLeaveTypesError && (
+                  <option value="" disabled>Failed to load leave types</option>
+                )}
+                {!isLoadingLeaveTypes && !isLeaveTypesError && (
+                  <option value="">Select leave type</option>
+                )}
+                {!isLoadingLeaveTypes && !isLeaveTypesError && leaveTypes?.map((lt) => (
+                  <option key={lt._id} value={lt._id}>{lt.name}</option>
+                ))}
               </select>
             </div>
 
             {/* Date ranges */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Start Date</label>
+                <label className="text-xs font-semibold text-slate-600">From Date</label>
                 <Input
                   type="date"
-                  value={formValues.startDate}
-                  onChange={(e) => setFormValues({ ...formValues, startDate: e.target.value })}
+                  value={formValues.fromDate}
+                  onChange={(e) => setFormValues({ ...formValues, fromDate: e.target.value })}
                   required
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">End Date</label>
+                <label className="text-xs font-semibold text-slate-600">To Date</label>
                 <Input
                   type="date"
-                  value={formValues.endDate}
-                  onChange={(e) => setFormValues({ ...formValues, endDate: e.target.value })}
+                  value={formValues.toDate}
+                  onChange={(e) => setFormValues({ ...formValues, toDate: e.target.value })}
                   required
                 />
               </div>
@@ -950,8 +970,8 @@ export default function LeavePage() {
               <Input
                 type="tel"
                 placeholder="+1 (555) 000-0000"
-                value={formValues.contactNumber}
-                onChange={(e) => setFormValues({ ...formValues, contactNumber: e.target.value })}
+                value={formValues.emergencyContact}
+                onChange={(e) => setFormValues({ ...formValues, emergencyContact: e.target.value })}
               />
             </div>
 
@@ -979,9 +999,10 @@ export default function LeavePage() {
               <Button
                 type="submit"
                 size="sm"
-                className="bg-indigo-600 text-white hover:bg-indigo-700 font-semibold"
+                disabled={isLoadingLeaveTypes || createRequestMutation.isPending}
+                className="bg-indigo-600 text-white hover:bg-indigo-700 font-semibold disabled:opacity-50"
               >
-                Submit Request
+                {createRequestMutation.isPending ? "Submitting..." : "Submit Request"}
               </Button>
             </DialogFooter>
           </form>

@@ -5,6 +5,7 @@ import {
   LeaveListResponse,
   LeaveBalance,
   LeaveCalendarEvent,
+  LeaveTypeOption,
   LeaveSearchParams,
   CreateLeaveRequestData,
   ApproveRejectRequestData,
@@ -13,8 +14,11 @@ import {
 const BASE_REQUESTS = "/hrms/leave-requests";
 const BASE_BALANCE = "/hrms/leave-balance";
 const BASE_CALENDAR = "/hrms/leave-calendar";
+const BASE_LEAVE_TYPES = "/hrms/leave-types";
 
 export const leaveApi = {
+  getLeaveTypes: () =>
+    apiGet<LeaveTypeOption[]>(BASE_LEAVE_TYPES),
   getAll: (params?: LeaveSearchParams) =>
     apiGet<LeaveListResponse>(`${BASE_REQUESTS}${buildQueryString(params ?? {})}`),
 

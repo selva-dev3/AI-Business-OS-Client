@@ -63,12 +63,19 @@ export type LeaveSearchParams = ListParams & {
   employeeId?: string;
 };
 
+export type LeaveTypeOption = {
+  _id: string;
+  name: string;
+  daysPerYear?: number;
+  isActive?: boolean;
+};
+
 export type CreateLeaveRequestData = {
-  leaveType: LeaveType;
-  startDate: string;
-  endDate: string;
-  reason: string;
-  contactNumber?: string;
+  leaveTypeId: string;
+  fromDate: string;
+  toDate: string;
+  reason?: string;
+  emergencyContact?: string;
 };
 
 export type ApproveRejectRequestData = {

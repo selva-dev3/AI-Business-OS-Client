@@ -7,6 +7,14 @@ import {
   ApproveRejectRequestData,
 } from "./leave.types";
 
+export function useLeaveTypes() {
+  return useQuery({
+    queryKey: leaveKeys.leaveTypes(),
+    queryFn: () => leaveApi.getLeaveTypes(),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useLeaveRequests(params?: LeaveSearchParams) {
   return useQuery({
     queryKey: leaveKeys.list(params),

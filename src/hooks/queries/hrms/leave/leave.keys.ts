@@ -8,4 +8,5 @@ export const leaveKeys = {
   balance: (employeeId?: string) => [...leaveKeys.balances(), employeeId] as const,
   calendars: () => [...leaveKeys.all, "calendar"] as const,
   calendar: (params?: unknown) => [...leaveKeys.calendars(), params] as const,
+  leaveTypes: () => [...leaveKeys.all, "leaveTypes"] as const,
 } as const;
