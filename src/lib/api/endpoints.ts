@@ -18,6 +18,7 @@ export const endpoints = {
     leaveBalance: "/hrms/leave-balance",
     leaveCalendar: "/hrms/leave-calendar",
     payroll: "/hrms/payroll",
+    assets: "/hrms/assets",
   },
   crm: {
     leads: "/crm/leads",
