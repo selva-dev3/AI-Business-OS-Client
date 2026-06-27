@@ -45,7 +45,10 @@ export function useDeleteEmployee() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => employeesApi.delete(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: employeesKeys.all }),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: employeesKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: employeesKeys.all });
+    },
   });
 }
 
@@ -53,8 +56,19 @@ export function useActivateEmployee() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => employeesApi.activate(id),
-    onSuccess: (data: any) => {
-      qc.invalidateQueries({ queryKey: employeesKeys.detail(data?.data?._id) });
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: employeesKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: employeesKeys.all });
+    },
+  });
+}
+
+export function useDeleteEmployeePermanent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => employeesApi.deletePermanent(id),
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: employeesKeys.detail(id) });
       qc.invalidateQueries({ queryKey: employeesKeys.all });
     },
   });

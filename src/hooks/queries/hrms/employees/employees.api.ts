@@ -23,6 +23,8 @@ export const employeesApi = {
 
   delete: (id: string) => apiDelete<{ message: string }>(`${BASE}/${id}`),
 
+  deletePermanent: (id: string) => apiDelete<{ message: string }>(`${BASE}/${id}/permanent`),
+
   activate: (id: string) => apiPost<{ message: string }>(`${BASE}/${id}/activate`),
 
   bulkImport: (file: File) => {

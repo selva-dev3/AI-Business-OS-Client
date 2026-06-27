@@ -16,11 +16,9 @@ import {
   MoreVertical,
   Building,
   Briefcase,
-  Calendar,
   Mail,
   Phone,
   MapPin,
-  Sparkles,
   RefreshCw,
   FileSpreadsheet,
   Check,
@@ -659,10 +657,8 @@ export default function EmployeesPage() {
       </div>
 
       {/* Main search, filter toolbar, and layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        {/* Left main database column */}
-        <div className="lg:col-span-3 space-y-4">
-          <Card className="border-slate-200 bg-white">
+      <div className="space-y-4">
+        <Card className="border-slate-200 bg-white">
             <CardHeader className="pb-3 border-b border-slate-100">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="relative flex-1 max-w-md">
@@ -834,59 +830,6 @@ export default function EmployeesPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
-
-        {/* Right side insights bar */}
-        <div className="space-y-4">
-          <Card className="border-indigo-100 bg-indigo-50/45 dark:bg-slate-900/10">
-            <CardHeader className="pb-2">
-              <div className="flex items-center gap-2 text-indigo-900 dark:text-indigo-200">
-                <Sparkles className="h-4 w-4 fill-indigo-100" />
-                <CardTitle className="text-sm font-bold uppercase tracking-wider">AI HR Copilot</CardTitle>
-              </div>
-              <CardDescription className="text-xs text-slate-500">
-                Real-time recommendations generated from organizational patterns.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="p-3 bg-white rounded-lg border border-indigo-100/50 shadow-xs flex items-start gap-2.5">
-                <div className="h-7 w-7 rounded-full bg-amber-50 border border-amber-100 flex items-center justify-center text-amber-600 shrink-0">
-                  <AlertCircle className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Contract Renewals Required</h4>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-normal">
-                    2 contract terms ending within 30 days (Emily Watson, David Lee). Request review workflows.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3 bg-white rounded-lg border border-indigo-100/50 shadow-xs flex items-start gap-2.5">
-                <div className="h-7 w-7 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
-                  <Users className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Engineering Turnover Risk</h4>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-normal">
-                    Increased workload logs in Engineering department indicate high exhaustion indicators.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-3 bg-white rounded-lg border border-indigo-100/50 shadow-xs flex items-start gap-2.5">
-                <div className="h-7 w-7 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-                  <Calendar className="h-3.5 w-3.5" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">Performance Overdues</h4>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-normal">
-                    4 employees are overdue for their annual evaluation reviews. Trigger evaluations.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       <Dialog open={isAddEditOpen} onOpenChange={setIsAddEditOpen}>
