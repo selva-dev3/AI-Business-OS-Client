@@ -51,10 +51,19 @@ import {
   useUpdateEmployee,
   useDeleteEmployee,
   useBulkImportEmployees,
+  useActivateEmployee,
+  useDeleteEmployeePermanent,
 } from "@/hooks/queries/hrms/employees/employees.hooks";
+import { useDepartments } from "@/hooks/queries/hrms/departments/departments.hooks";
 import { Employee, CreateEmployeeData, UpdateEmployeeData } from "@/hooks/queries/hrms/employees/employees.types";
 import { apiGet } from "@/hooks/queries/client";
 import { DataTable, Column } from "@/components/shared/datatable";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function EmployeesPage() {
   // Filters state
@@ -227,16 +236,28 @@ export default function EmployeesPage() {
   const updateMutation = useUpdateEmployee(editingEmployee?.id || "");
   const deleteMutation = useDeleteEmployee();
   const importMutation = useBulkImportEmployees();
+  const activateMutation = useActivateEmployee();
+  const deletePermanentMutation = useDeleteEmployeePermanent();
 
-  // Departments List (static mapping)
-  const departments = [
-    { id: "dept-1", name: "Engineering" },
-    { id: "dept-2", name: "Product & Design" },
-    { id: "dept-3", name: "Sales & Marketing" },
-    { id: "dept-4", name: "Human Resources" },
-    { id: "dept-5", name: "Finance & Legal" },
-    { id: "dept-6", name: "Customer Support" },
-  ];
+  // Fetch departments dynamically
+  const { data: dbDepartments } = useDepartments();
+  const departments: { id: string; name: string }[] = React.useMemo(() => {
+    const list = Array.isArray(dbDepartments) ? dbDepartments : ((dbDepartments as any)?.data || []);
+    if (list.length > 0) {
+      return list.map((d: any) => ({
+        id: d.id || d._id,
+        name: d.name,
+      }));
+    }
+    return [
+      { id: "dept-1", name: "Engineering" },
+      { id: "dept-2", name: "Product & Design" },
+      { id: "dept-3", name: "Sales & Marketing" },
+      { id: "dept-4", name: "Human Resources" },
+      { id: "dept-5", name: "Finance & Legal" },
+      { id: "dept-6", name: "Customer Support" },
+    ];
+  }, [dbDepartments]);
 
   // Managers List (mock mapping)
   const managers = [
@@ -516,6 +537,47 @@ export default function EmployeesPage() {
     }
   };
 
+  const handleToggleStatus = async (emp: Employee, newStatus: "active" | "inactive") => {
+    try {
+      if (newStatus === "active") {
+        await activateMutation.mutateAsync(emp.id);
+        toast.success(`Employee ${emp.firstName} ${emp.lastName} is now active`);
+      } else {
+        await deleteMutation.mutateAsync(emp.id);
+        toast.success(`Employee ${emp.firstName} ${emp.lastName} is now inactive`);
+      }
+      refetch();
+    } catch (err: any) {
+      console.error("Failed to toggle status:", err);
+      const errMsg = err?.response?.data?.message || err?.message || "Failed to update employee status";
+      toast.error(errMsg);
+    }
+  };
+
+  const handlePermanentDelete = async (emp: Employee) => {
+    if (emp.status === "active") {
+      toast.error("Cannot permanently delete an active employee. Deactivate first.");
+      return;
+    }
+    if (
+      !confirm(
+        `Are you sure you want to permanently delete ${emp.firstName} ${emp.lastName}? This action cannot be undone and will delete all associated records.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await deletePermanentMutation.mutateAsync(emp.id);
+      toast.success("Employee permanently deleted");
+      refetch();
+    } catch (err: any) {
+      console.error("Failed to delete permanently:", err);
+      const errMsg =
+        err?.response?.data?.message || err?.message || "Failed to permanently delete employee";
+      toast.error(errMsg);
+    }
+  };
+
   // CSV Import handler
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -536,8 +598,19 @@ export default function EmployeesPage() {
       setIsImportOpen(false);
       setImportFile(null);
       refetch();
-    } catch (err) {
-      toast.info("Bulk import completed using mock CSV processor.");
+    } catch (err: any) {
+      console.error("Bulk import error:", err);
+      const errorsList = err?.response?.data?.data?.errors;
+      if (Array.isArray(errorsList) && errorsList.length > 0) {
+        const displayErrors = errorsList.slice(0, 3).map((e: any) => `Row ${e.row}: ${e.message}`).join("\n");
+        const remaining = errorsList.length - 3;
+        toast.error(`Import failed:\n${displayErrors}${remaining > 0 ? `\n...and ${remaining} more errors` : ""}`, {
+          duration: 6000,
+        });
+      } else {
+        const errMsg = err?.response?.data?.message || err?.message || "An unexpected error occurred.";
+        toast.error(errMsg);
+      }
       setIsImportOpen(false);
       setImportFile(null);
     }
@@ -641,24 +714,52 @@ export default function EmployeesPage() {
       header: "Actions",
       className: "text-center",
       cell: (emp) => (
-        <div className="flex items-center justify-center gap-1.5">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleOpenEdit(emp)}
-            className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
-          >
-            <Edit2 className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => handleOpenDelete(emp)}
-            className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md"
-          >
-            <Trash2 className="h-3.5 w-3.5" />
-          </Button>
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 text-slate-400 hover:text-slate-600 rounded-md focus-visible:ring-0 focus-visible:ring-offset-0"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-[160px] bg-white border border-slate-200 shadow-md rounded-md p-1">
+            <DropdownMenuItem
+              onClick={() => handleOpenEdit(emp)}
+              className="text-xs font-semibold text-slate-700 cursor-pointer flex items-center px-2 py-1.5 hover:bg-slate-50 rounded-sm"
+            >
+              <Edit2 className="mr-2 h-3.5 w-3.5 text-slate-400" />
+              Edit details
+            </DropdownMenuItem>
+
+            {emp.status === "active" ? (
+              <DropdownMenuItem
+                onClick={() => handleToggleStatus(emp, "inactive")}
+                className="text-xs font-semibold text-slate-700 cursor-pointer flex items-center px-2 py-1.5 hover:bg-slate-50 rounded-sm"
+              >
+                <UserX className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                Make Inactive
+              </DropdownMenuItem>
+            ) : emp.status === "inactive" ? (
+              <DropdownMenuItem
+                onClick={() => handleToggleStatus(emp, "active")}
+                className="text-xs font-semibold text-slate-700 cursor-pointer flex items-center px-2 py-1.5 hover:bg-slate-50 rounded-sm"
+              >
+                <UserCheck className="mr-2 h-3.5 w-3.5 text-slate-400" />
+                Make Active
+              </DropdownMenuItem>
+            ) : null}
+
+            <DropdownMenuItem
+              onClick={() => handlePermanentDelete(emp)}
+              className="text-xs font-semibold text-rose-600 focus:text-rose-600 focus:bg-rose-50 cursor-pointer flex items-center px-2 py-1.5 rounded-sm"
+            >
+              <Trash2 className="mr-2 h-3.5 w-3.5 text-rose-500" />
+              Permanent Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ),
     },
   ];
