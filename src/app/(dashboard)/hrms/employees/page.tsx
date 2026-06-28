@@ -212,10 +212,15 @@ export default function EmployeesPage() {
   });
 
   // Fetch designations
-  const { data: designations = [], isLoading: isLoadingDesignations } = useQuery<any[]>({
-    queryKey: ["hrms", "designations"],
-    queryFn: () => apiGet<any[]>("/hrms/designations"),
+  const { data: rawDesignations, isLoading: isLoadingDesignations } = useQuery<any>({
+    queryKey: ["hrms", "designations", "all"],
+    queryFn: () => apiGet<any>("/hrms/designations/all"),
   });
+
+  const designations = React.useMemo(() => {
+    const rawList = Array.isArray(rawDesignations) ? rawDesignations : ((rawDesignations as any)?.data || []);
+    return rawList.map((d: any) => ({ ...d, id: d.id || d._id }));
+  }, [rawDesignations]);
 
   // Mutations
   const createMutation = useCreateEmployee();
