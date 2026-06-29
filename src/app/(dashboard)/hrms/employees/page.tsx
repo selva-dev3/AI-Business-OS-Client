@@ -360,6 +360,28 @@ export default function EmployeesPage() {
     setIsAddEditOpen(true);
   };
 
+  React.useEffect(() => {
+    if (typeof window !== "undefined" && serverEmployees?.employees) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const editId = searchParams.get("edit");
+      if (editId) {
+        const emp = serverEmployees.employees.find(
+          (e: any) => e.id === editId || e._id === editId
+        );
+        if (emp) {
+          handleOpenEdit(emp);
+          searchParams.delete("edit");
+          const newSearch = searchParams.toString();
+          window.history.replaceState(
+            {},
+            "",
+            window.location.pathname + (newSearch ? `?${newSearch}` : "")
+          );
+        }
+      }
+    }
+  }, [serverEmployees?.employees]);
+
   // Form submission handler
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

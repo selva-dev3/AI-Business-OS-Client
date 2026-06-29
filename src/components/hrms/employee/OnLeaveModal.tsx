@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useLeaveTypes } from "@/hooks/queries/hrms/leave/leave.hooks";
 import { useInitiateLeave } from "@/hooks/useEmployeeMutations";
 import {
   Dialog,
@@ -23,15 +24,6 @@ import { Button } from "@/components/ui/button";
 import { TreePalm, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
-const LEAVE_TYPES = [
-  { value: "Casual", label: "Casual Leave" },
-  { value: "Sick", label: "Sick Leave" },
-  { value: "Earned", label: "Earned Leave" },
-  { value: "Maternity", label: "Maternity Leave" },
-  { value: "Paternity", label: "Paternity Leave" },
-  { value: "Unpaid", label: "Unpaid Leave" },
-];
-
 interface OnLeaveModalProps {
   employeeId: string;
   employeeName: string;
@@ -48,6 +40,12 @@ export function OnLeaveModal({
   onSuccess,
 }: OnLeaveModalProps) {
   const mutation = useInitiateLeave();
+  const { data: serverLeaveTypes, isLoading: isLoadingLeaveTypes } = useLeaveTypes();
+
+  const leaveTypesList = React.useMemo(() => {
+    const list = Array.isArray(serverLeaveTypes) ? serverLeaveTypes : ((serverLeaveTypes as any)?.data || []);
+    return list.filter((t: any) => t.isActive !== false);
+  }, [serverLeaveTypes]);
 
   const [leaveType, setLeaveType] = React.useState("");
   const [startDate, setStartDate] = React.useState("");
@@ -89,7 +87,7 @@ export function OnLeaveModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md bg-white border border-slate-200 rounded-xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TreePalm className="h-5 w-5 text-amber-500" />
@@ -99,16 +97,30 @@ export function OnLeaveModal({
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label>Leave Type *</Label>
-            <Select value={leaveType} onValueChange={setLeaveType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select leave type" />
-              </SelectTrigger>
-              <SelectContent>
-                {LEAVE_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {isLoadingLeaveTypes ? (
+              <div className="text-xs text-slate-400 flex items-center gap-1.5 py-2">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Loading leave types...
+              </div>
+            ) : leaveTypesList.length === 0 ? (
+              <div className="text-xs text-rose-500 py-2">No leave types available</div>
+            ) : (
+              <Select value={leaveType} onValueChange={setLeaveType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select leave type" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border border-slate-200 shadow-md">
+                  {leaveTypesList.map((t: any) => {
+                    const val = t.id || t._id;
+                    return (
+                      <SelectItem key={val} value={val}>
+                        {t.name}
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">

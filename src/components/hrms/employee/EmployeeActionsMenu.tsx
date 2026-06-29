@@ -13,6 +13,7 @@ import {
   FileDown,
   Ban,
   MoreVertical,
+  UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,6 +31,10 @@ import {
   useTerminateEmployee,
   useResetPassword,
 } from "@/hooks/useEmployeeMutations";
+import {
+  useActivateEmployee,
+  useDeleteEmployeePermanent,
+} from "@/hooks/queries/hrms/employees/employees.hooks";
 import { SuspendEmployeeModal } from "@/components/hrms/employee/SuspendEmployeeModal";
 import { TerminateEmployeeModal } from "@/components/hrms/employee/TerminateEmployeeModal";
 import { OnLeaveModal } from "@/components/hrms/employee/OnLeaveModal";
@@ -51,6 +56,8 @@ export function EmployeeActionsMenu({
   const reinstateMutation = useReinstateEmployee();
   const terminateMutation = useTerminateEmployee();
   const resetPasswordMutation = useResetPassword();
+  const activateMutation = useActivateEmployee();
+  const deletePermanentMutation = useDeleteEmployeePermanent();
 
   const [suspendOpen, setSuspendOpen] = React.useState(false);
   const [terminateOpen, setTerminateOpen] = React.useState(false);
@@ -64,6 +71,33 @@ export function EmployeeActionsMenu({
       onUpdate();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Failed to reinstate");
+    }
+  };
+
+  const handleActivate = async () => {
+    try {
+      await activateMutation.mutateAsync(employee.id);
+      toast.success("Employee activated successfully");
+      onUpdate();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to activate");
+    }
+  };
+
+  const handlePermanentDelete = async () => {
+    if (
+      !confirm(
+        `Are you sure you want to permanently delete ${employee.firstName} ${employee.lastName}? This action cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await deletePermanentMutation.mutateAsync(employee.id);
+      toast.success("Employee permanently deleted");
+      router.push("/hrms/employees");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || "Failed to delete permanently");
     }
   };
 
@@ -87,42 +121,50 @@ export function EmployeeActionsMenu({
             Actions
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          <DropdownMenuItem onClick={() => /* TODO: open edit sheet */ toast.info("Edit coming soon")}>
-            <Edit className="mr-2 h-4 w-4" />
+        <DropdownMenuContent align="end" className="w-52 bg-white border border-slate-200 shadow-md">
+          <DropdownMenuItem onClick={() => router.push(`/hrms/employees?edit=${employee.id}`)}>
+            <Edit className="mr-2 h-4 w-4 text-slate-400" />
             Edit Profile
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
 
-          {isHrManager && status === "active" && (
-            <DropdownMenuItem onClick={() => setSuspendOpen(true)}>
-              <OctagonAlert className="mr-2 h-4 w-4 text-amber-500" />
-              Suspend Employee
-            </DropdownMenuItem>
-          )}
-          {isHrManager && status === "suspended" && (
-            <DropdownMenuItem onClick={handleReinstate}>
-              <OctagonAlert className="mr-2 h-4 w-4 text-emerald-500" />
-              Reinstate Employee
-            </DropdownMenuItem>
-          )}
-          {isHrManager && status === "active" && (
-            <DropdownMenuItem onClick={() => setOnLeaveOpen(true)}>
-              <TreePalm className="mr-2 h-4 w-4 text-amber-500" />
-              Put On Leave
-            </DropdownMenuItem>
-          )}
-          {isHrManager && status !== "terminated" && (
-            <DropdownMenuItem onClick={handleSendReset}>
-              <Key className="mr-2 h-4 w-4 text-slate-500" />
-              Reset Password
-            </DropdownMenuItem>
+          {status === "inactive" && (
+            <>
+              <DropdownMenuItem onClick={handleActivate}>
+                <UserCheck className="mr-2 h-4 w-4 text-emerald-500" />
+                Make Active
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handlePermanentDelete}
+                className="text-rose-600 focus:text-rose-600 focus:bg-rose-50"
+              >
+                <Trash2 className="mr-2 h-4 w-4 text-rose-500" />
+                Permanent Delete
+              </DropdownMenuItem>
+            </>
           )}
 
-          {isAdmin && status !== "terminated" && (
+          {(status === "active" || status === "suspended") && (
             <>
-              <DropdownMenuSeparator />
+              {status === "active" && (
+                <DropdownMenuItem onClick={() => setSuspendOpen(true)}>
+                  <OctagonAlert className="mr-2 h-4 w-4 text-amber-500" />
+                  Suspend Employee
+                </DropdownMenuItem>
+              )}
+              {status === "suspended" && (
+                <DropdownMenuItem onClick={handleReinstate}>
+                  <OctagonAlert className="mr-2 h-4 w-4 text-emerald-500" />
+                  Reinstate Employee
+                </DropdownMenuItem>
+              )}
+              {status === "active" && (
+                <DropdownMenuItem onClick={() => setOnLeaveOpen(true)}>
+                  <TreePalm className="mr-2 h-4 w-4 text-amber-500" />
+                  Put On Leave
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem onClick={() => setTerminateOpen(true)}>
                 <AlertTriangle className="mr-2 h-4 w-4 text-rose-500" />
                 Terminate Employee
@@ -130,19 +172,16 @@ export function EmployeeActionsMenu({
             </>
           )}
 
-          {isAdmin && (
-            <DropdownMenuItem
-              onClick={() => toast.info("Permanent delete coming soon")}
-              className="text-rose-600 focus:text-rose-600 focus:bg-rose-50"
-            >
-              <Trash2 className="mr-2 h-4 w-4 text-rose-500" />
-              Permanent Delete
+          {status !== "terminated" && (
+            <DropdownMenuItem onClick={handleSendReset}>
+              <Key className="mr-2 h-4 w-4 text-slate-500" />
+              Reset Password
             </DropdownMenuItem>
           )}
 
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => toast.info("Export PDF coming soon")}>
-            <FileDown className="mr-2 h-4 w-4" />
+            <FileDown className="mr-2 h-4 w-4 text-slate-400" />
             Export Profile PDF
           </DropdownMenuItem>
         </DropdownMenuContent>
