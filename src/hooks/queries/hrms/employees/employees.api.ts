@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPatch, apiDelete } from "@/hooks/queries/client";
+  import { apiGet, apiPost, apiPatch, apiDelete } from "@/hooks/queries/client";
 import { buildQueryString } from "@/hooks/queries/utils";
 import {
   Employee,
@@ -81,12 +81,12 @@ export const employeesApi = {
   resetPassword: (id: string, data: ResetPasswordData) => apiPost<ResetPasswordResponse>(`${BASE}/${id}/reset-password`, data),
 
   getDocuments: (id: string, params?: { type?: string; page?: number; limit?: number }) =>
-    apiGet<{ records: EmployeeDocumentItem[]; meta: any }>(`${BASE}/${id}/documents${buildQueryString(params ?? {})}`),
+    apiGet<{ data: EmployeeDocumentItem[]; meta: any }>(`${BASE}/${id}/documents${buildQueryString(params ?? {})}`),
 
   createDocument: (id: string, data: CreateDocumentData) => apiPost<EmployeeDocumentItem>(`${BASE}/${id}/documents`, data),
 
   getNotes: (id: string, params?: { category?: string; page?: number; limit?: number }) =>
-    apiGet<{ records: EmployeeNoteItem[]; meta: any }>(`${BASE}/${id}/notes${buildQueryString(params ?? {})}`),
+    apiGet<{ data: EmployeeNoteItem[]; meta: any }>(`${BASE}/${id}/notes${buildQueryString(params ?? {})}`),
 
   createNote: (id: string, data: CreateNoteData) => apiPost<EmployeeNoteItem>(`${BASE}/${id}/notes`, data),
 

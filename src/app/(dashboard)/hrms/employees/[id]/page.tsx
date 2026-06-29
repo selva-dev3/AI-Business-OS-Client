@@ -85,7 +85,14 @@ export default function EmployeeDetailPage() {
   const [activeTab, setActiveTab] = React.useState<EmployeeTabKey>(
     (tabParam as EmployeeTabKey) || "overview"
   );
-  const [mountedTabs, setMountedTabs] = React.useState<Set<string>>(new Set(["overview"]));
+  const [mountedTabs, setMountedTabs] = React.useState<Set<string>>(new Set(["overview", tabParam]));
+
+  React.useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam as EmployeeTabKey);
+      setMountedTabs((prev) => new Set(prev).add(tabParam));
+    }
+  }, [tabParam]);
 
   const { data: serverEmployee, isLoading, isError } = useEmployeeProfile(id);
 

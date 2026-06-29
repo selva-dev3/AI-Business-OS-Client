@@ -50,7 +50,7 @@ import { cn } from "@/lib/utils";
 import { EmployeeNoteItem } from "@/types/hrms";
 import { toast } from "sonner";
 
-const CATEGORIES = ["General", "Performance", "Disciplinary", "Training", "Appraisal", "Other"];
+const CATEGORIES = ["GENERAL", "PERFORMANCE", "DISCIPLINARY", "TRAINING", "APPRAISAL", "OTHER"];
 const VISIBILITY_OPTIONS = [
   { value: "hr_only", label: "HR Only" },
   { value: "admin_only", label: "Admin Only" },
@@ -73,7 +73,7 @@ export default function NotesTab({ employeeId }: { employeeId: string }) {
   const updateMutation = useUpdateNote();
   const deleteMutation = useDeleteNote();
 
-  const records: EmployeeNoteItem[] = data?.records ?? [];
+  const records: EmployeeNoteItem[] = data?.data ?? [];
 
   // Form state
   const [content, setContent] = React.useState("");

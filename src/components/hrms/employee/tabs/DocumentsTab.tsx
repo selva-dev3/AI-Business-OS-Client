@@ -46,7 +46,7 @@ import { cn } from "@/lib/utils";
 import { EmployeeDocumentItem } from "@/types/hrms";
 import { toast } from "sonner";
 
-const DOC_TYPES = ["Offer Letter", "Contract", "ID Proof", "Address Proof", "Degree", "Payslip", "Other"];
+const DOC_TYPES = ["OFFER_LETTER", "CONTRACT", "ID_PROOF", "ADDRESS_PROOF", "DEGREE", "PAYSLIP", "OTHER"];
 
 export default function DocumentsTab({ employeeId }: { employeeId: string }) {
   const [typeFilter, setTypeFilter] = React.useState("all");
@@ -60,7 +60,7 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
 
   const createMutation = useCreateDocument();
 
-  const records: EmployeeDocumentItem[] = data?.records ?? [];
+  const records: EmployeeDocumentItem[] = data?.data ?? [];
 
   // Upload form state
   const [docType, setDocType] = React.useState("");
