@@ -35,6 +35,6 @@ export const employeesApi = {
     });
   },
 
-  export: (params?: { format?: string; status?: string; departmentId?: string }) =>
-    apiGet<Blob>(`${BASE}/export${buildQueryString(params ?? {})}`, { responseType: "blob" }),
+  export: (params?: { format?: string; status?: string; departmentId?: string; designationId?: string }) =>
+    apiGet<any[]>(`${BASE}/export${buildQueryString(params ?? {})}`),
 } as const;

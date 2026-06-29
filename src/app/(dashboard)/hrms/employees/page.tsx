@@ -56,6 +56,7 @@ import {
 } from "@/hooks/queries/hrms/employees/employees.hooks";
 import { useDepartments } from "@/hooks/queries/hrms/departments/departments.hooks";
 import { Employee, CreateEmployeeData, UpdateEmployeeData } from "@/hooks/queries/hrms/employees/employees.types";
+import { employeesApi } from "@/hooks/queries/hrms/employees/employees.api";
 import { apiGet } from "@/hooks/queries/client";
 import { DataTable, Column } from "@/components/shared/datatable";
 import {
@@ -211,6 +212,7 @@ export default function EmployeesPage() {
 
   // Bulk import state
   const [importFile, setImportFile] = React.useState<File | null>(null);
+  const [isExporting, setIsExporting] = React.useState(false);
 
   // Fetch employees
   const { data: serverEmployees, isLoading, refetch } = useEmployees({
@@ -616,6 +618,83 @@ export default function EmployeesPage() {
     }
   };
 
+  const handleExportCSV = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      toast.info("Preparing employee export...");
+      const data = await employeesApi.export({
+        status: statusFilter || undefined,
+        departmentId: deptFilter || undefined,
+      });
+
+      if (!Array.isArray(data) || data.length === 0) {
+        toast.error("No employees found to export");
+        return;
+      }
+
+      // Define CSV headers
+      const headers = [
+        "Employee Code",
+        "First Name",
+        "Last Name",
+        "Email",
+        "Phone",
+        "Designation",
+        "Department",
+        "Employment Type",
+        "Status",
+        "Date of Joining",
+      ];
+
+      // Helper to escape CSV values safely
+      const escapeCSVValue = (val: any) => {
+        if (val === null || val === undefined) return "";
+        const str = String(val);
+        if (str.includes(",") || str.includes('"') || str.includes("\n") || str.includes("\r")) {
+          return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
+      };
+
+      // Map rows
+      const rows = data.map((emp: any) => [
+        emp.employeeCode || "",
+        emp.firstName || "",
+        emp.lastName || "",
+        emp.email || "",
+        emp.phone || "",
+        emp.designation || (emp.designationId?.name) || "",
+        emp.departmentId?.name || (departments.find((d) => d.id === emp.departmentId)?.name) || "",
+        emp.employmentType || "",
+        emp.status || "",
+        emp.dateOfJoining ? new Date(emp.dateOfJoining).toLocaleDateString() : "",
+      ]);
+
+      // Combine headers and rows
+      const csvContent = [
+        headers.join(","),
+        ...rows.map((row) => row.map(escapeCSVValue).join(",")),
+      ].join("\n");
+
+      // Download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `employees_export_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success("CSV exported successfully");
+    } catch (err: any) {
+      console.error("Export error:", err);
+      toast.error("Failed to export employees");
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   // Helper styles for status badge
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -789,13 +868,12 @@ export default function EmployeesPage() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => {
-              toast.success("Exporting employee database...");
-            }}
+            onClick={handleExportCSV}
+            disabled={isExporting}
             className="flex items-center gap-2 text-slate-600 dark:text-slate-300"
           >
             <Download className="h-4 w-4" />
-            Export CSV
+            {isExporting ? "Exporting..." : "Export CSV"}
           </Button>
           <Button
             size="sm"
