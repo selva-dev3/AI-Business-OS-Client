@@ -394,7 +394,7 @@ export default function AttendanceDetailPage() {
   const initials = emp ? `${emp.firstName.charAt(0)}${emp.lastName.charAt(0)}`.toUpperCase() : "EM";
 
   return (
-    <div className="p-6 space-y-6 w-full max-w-5xl mx-auto">
+    <div className="p-6 space-y-6 w-full">
       {/* Header breadcrumb & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -480,7 +480,7 @@ export default function AttendanceDetailPage() {
               Clock Workstation
             </CardTitle>
             <CardDescription className="text-xs text-indigo-700/80">
-              Current local workstation session.
+              Update session status for this record.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pt-1">
@@ -488,13 +488,17 @@ export default function AttendanceDetailPage() {
               <h2 className="text-3xl font-extrabold text-slate-900 font-mono tracking-tight">
                 {currentTimeText || "--:--:--"}
               </h2>
-              {currentUserStatus.checkedIn ? (
+              {isRecordCheckedIn ? (
                 <div className="flex items-center justify-center gap-2 mt-2">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span className="text-xs font-semibold text-emerald-700">
-                    Logged: {timerText}
+                    Active Duration: {recordTimerText}
                   </span>
                 </div>
+              ) : record?.checkOut ? (
+                <p className="text-xs font-semibold text-indigo-600 mt-2">
+                  Session Completed
+                </p>
               ) : (
                 <p className="text-xs font-medium text-slate-500 mt-2">
                   Ready to clock check-in record
@@ -503,39 +507,47 @@ export default function AttendanceDetailPage() {
             </div>
 
             <div className="flex gap-2">
-              {!currentUserStatus.checkedIn ? (
+              {!record?.checkIn ? (
                 <Button
-                  onClick={handleOpenWorkstationCheckIn}
+                  onClick={handleRecordCheckIn}
                   className="flex-1 bg-indigo-600 text-white hover:bg-indigo-700 font-semibold shadow-xs flex items-center justify-center gap-2"
                 >
                   <Play className="h-4 w-4 fill-white" />
                   Check In
                 </Button>
-              ) : (
+              ) : isRecordCheckedIn ? (
                 <Button
-                  onClick={handleCheckOut}
+                  onClick={handleRecordCheckOut}
                   variant="destructive"
                   className="flex-1 bg-red-600 hover:bg-red-700 font-semibold shadow-xs flex items-center justify-center gap-2"
                 >
                   <Square className="h-4 w-4 fill-white" />
                   Check Out
                 </Button>
+              ) : (
+                <Button
+                  disabled
+                  className="flex-1 bg-slate-200 text-slate-400 font-semibold cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  <CheckCircle2 className="h-4 w-4" />
+                  Completed
+                </Button>
               )}
             </div>
 
-            {currentUserStatus.checkInTime && (
+            {record?.checkIn && (
               <div className="border-t border-indigo-100/60 pt-3 text-[11px] text-slate-500 space-y-1">
                 <div className="flex justify-between">
                   <span>Checked In:</span>
                   <span className="font-semibold text-slate-800">
-                    {new Date(currentUserStatus.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {new Date(record.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </div>
-                {currentUserStatus.checkOutTime && (
+                {record?.checkOut && (
                   <div className="flex justify-between">
                     <span>Checked Out:</span>
                     <span className="font-semibold text-slate-800">
-                      {new Date(currentUserStatus.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(record.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </span>
                   </div>
                 )}

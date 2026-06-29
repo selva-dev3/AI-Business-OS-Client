@@ -375,7 +375,7 @@ export default function AttendancePage() {
   // Combine server data and local records
   const attendanceList = React.useMemo(() => {
     const apiData = (serverAttendance?.data || []).map(normalizeAttendance);
-    const sourceData = apiData.length > 0 ? apiData : localRecords;
+    const sourceData = apiData;
 
     // Filter data based on search and filters
     return sourceData.filter((record) => {
