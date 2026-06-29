@@ -47,9 +47,79 @@ export type Employee = {
   updatedAt: string;
 };
 
+export interface RawSummary {
+  totalHeadcount: number;
+  activeStaff: number;
+  onLeave: number;
+  inactive: number;
+  suspended: number;
+}
+
+export interface ProcessedSummary extends RawSummary {
+  activePercentage: number;
+  onLeavePercentage: number;
+  inactivePercentage: number;
+  suspendedPercentage: number;
+
+  previousPeriod?: RawSummary;
+  changeFromPrevious?: {
+    activeChange: number;
+    activeChangePercent: number;
+    onLeaveChange: number;
+    inactiveChange: number;
+  };
+
+  lastUpdated: Date;
+  isStale: boolean;
+  dataQuality: 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR';
+}
+
+export interface EmployeeApiResponse {
+  success: boolean;
+  status: number;
+  message: string;
+  data: {
+    employees: Employee[];
+    pagination: PaginationMeta;
+    summary: RawSummary;
+  };
+}
+
+export interface SummaryState {
+  raw: RawSummary | null;
+  processed: ProcessedSummary | null;
+  loading: boolean;
+  error: Error | null;
+  lastFetchTime: Date | null;
+  cacheKey: string;
+}
+
+export type SummaryAction =
+  | { type: 'FETCH_START' }
+  | { type: 'FETCH_SUCCESS'; payload: EmployeeApiResponse }
+  | { type: 'FETCH_ERROR'; payload: Error }
+  | { type: 'INVALIDATE_CACHE' }
+  | { type: 'SET_STALE' };
+
+export interface CardMetricData {
+  label: string;
+  value: number;
+  percentage: number;
+  icon: string;
+  color: string;
+  trend: any;
+  status?: string;
+}
+
 export type EmployeeListResponse = {
+  // Backward compatibility
   data: Employee[];
   meta: PaginationMeta;
+
+  // Unified response contract
+  employees: Employee[];
+  pagination: PaginationMeta;
+  summary: RawSummary;
 };
 
 export type CreateEmployeeData = {

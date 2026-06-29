@@ -55,7 +55,8 @@ import {
   useDeleteEmployeePermanent,
 } from "@/hooks/queries/hrms/employees/employees.hooks";
 import { useDepartments } from "@/hooks/queries/hrms/departments/departments.hooks";
-import { Employee, CreateEmployeeData, UpdateEmployeeData } from "@/hooks/queries/hrms/employees/employees.types";
+import { Employee, CreateEmployeeData, UpdateEmployeeData, ProcessedSummary } from "@/hooks/queries/hrms/employees/employees.types";
+import { EmployeeSummaryDashboard } from "@/components/hrms/employee/EmployeeSummaryDashboard";
 import { employeesApi } from "@/hooks/queries/hrms/employees/employees.api";
 import { apiGet } from "@/hooks/queries/client";
 import { DataTable, Column } from "@/components/shared/datatable";
@@ -222,6 +223,16 @@ export default function EmployeesPage() {
     search: searchQuery || undefined,
   });
 
+  // Summary state and memoized filter parameters
+  const [summary, setSummary] = React.useState<ProcessedSummary | null>(null);
+
+  const summaryFilterParams = React.useMemo(() => ({
+    status: statusFilter || undefined,
+    departmentId: deptFilter || undefined,
+    employmentType: typeFilter || undefined,
+    search: searchQuery || undefined,
+  }), [statusFilter, deptFilter, typeFilter, searchQuery]);
+
   // Fetch designations
   const { data: rawDesignations, isLoading: isLoadingDesignations } = useQuery<any>({
     queryKey: ["hrms", "designations", "all"],
@@ -269,138 +280,10 @@ export default function EmployeesPage() {
     { id: "m4", name: "Marcus Aurelius" },
   ];
 
-  // Fallback high-fidelity mock data if no server data is returned yet
-  const fallbackEmployees: Employee[] = React.useMemo(() => {
-    return [
-      {
-        id: "emp-1",
-        employeeId: "EMP-2026-001",
-        firstName: "John",
-        lastName: "Doe",
-        email: "john.doe@company.com",
-        phone: "+1 (555) 234-5678",
-        designation: "Principal Engineer",
-        departmentId: "dept-1",
-        department: { id: "dept-1", name: "Engineering" },
-        managerId: "m2",
-        manager: { id: "m2", firstName: "Alex", lastName: "Rivera" },
-        status: "active",
-        employmentType: "full_time",
-        dateOfJoining: "2024-03-15",
-        createdAt: "2024-03-15T00:00:00Z",
-        updatedAt: "2024-03-15T00:00:00Z",
-        companyId: "comp-1",
-      },
-      {
-        id: "emp-2",
-        employeeId: "EMP-2026-002",
-        firstName: "Jane",
-        lastName: "Smith",
-        email: "jane.smith@company.com",
-        phone: "+1 (555) 876-5432",
-        designation: "Product Director",
-        departmentId: "dept-2",
-        department: { id: "dept-2", name: "Product & Design" },
-        managerId: "m1",
-        manager: { id: "m1", firstName: "Sarah", lastName: "Jenkins" },
-        status: "active",
-        employmentType: "full_time",
-        dateOfJoining: "2023-11-01",
-        createdAt: "2023-11-01T00:00:00Z",
-        updatedAt: "2023-11-01T00:00:00Z",
-        companyId: "comp-1",
-      },
-      {
-        id: "emp-3",
-        employeeId: "EMP-2026-003",
-        firstName: "Robert",
-        lastName: "Chen",
-        email: "robert.chen@company.com",
-        phone: "+1 (555) 456-7890",
-        designation: "Talent Partner",
-        departmentId: "dept-4",
-        department: { id: "dept-4", name: "Human Resources" },
-        managerId: "m1",
-        manager: { id: "m1", firstName: "Sarah", lastName: "Jenkins" },
-        status: "on_leave",
-        employmentType: "full_time",
-        dateOfJoining: "2025-01-20",
-        createdAt: "2025-01-20T00:00:00Z",
-        updatedAt: "2025-01-20T00:00:00Z",
-        companyId: "comp-1",
-      },
-      {
-        id: "emp-4",
-        employeeId: "EMP-2026-004",
-        firstName: "Emily",
-        lastName: "Watson",
-        email: "emily.watson@company.com",
-        phone: "+1 (555) 789-0123",
-        designation: "Marketing Specialist",
-        departmentId: "dept-3",
-        department: { id: "dept-3", name: "Sales & Marketing" },
-        managerId: "m3",
-        manager: { id: "m3", firstName: "Elena", lastName: "Rostova" },
-        status: "active",
-        employmentType: "contract",
-        dateOfJoining: "2025-05-10",
-        createdAt: "2025-05-10T00:00:00Z",
-        updatedAt: "2025-05-10T00:00:00Z",
-        companyId: "comp-1",
-      },
-      {
-        id: "emp-5",
-        employeeId: "EMP-2026-005",
-        firstName: "David",
-        lastName: "Kim",
-        email: "david.kim@company.com",
-        phone: "+1 (555) 901-2345",
-        designation: "QA Engineer Intern",
-        departmentId: "dept-1",
-        department: { id: "dept-1", name: "Engineering" },
-        managerId: "m2",
-        manager: { id: "m2", firstName: "Alex", lastName: "Rivera" },
-        status: "inactive",
-        employmentType: "intern",
-        dateOfJoining: "2026-04-01",
-        createdAt: "2026-04-01T00:00:00Z",
-        updatedAt: "2026-04-01T00:00:00Z",
-        companyId: "comp-1",
-      },
-    ];
-  }, []);
-
   // Filter local & server data
   const employeesList = React.useMemo(() => {
-    const list = serverEmployees?.data || [];
-    if (list.length > 0) return list;
-
-    // Apply search filter locally on fallback data
-    return fallbackEmployees.filter((emp) => {
-      const nameMatch = `${emp.firstName} ${emp.lastName}`
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase());
-      const roleMatch = emp.designation?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false;
-      const statusMatch = !statusFilter || emp.status === statusFilter;
-      const deptMatch = !deptFilter || emp.departmentId === deptFilter;
-      const typeMatch = !typeFilter || emp.employmentType === typeFilter;
-
-      return (nameMatch || roleMatch) && statusMatch && deptMatch && typeMatch;
-    });
-  }, [serverEmployees, fallbackEmployees, searchQuery, statusFilter, deptFilter, typeFilter]);
-
-  // Aggregate stats
-  const stats = React.useMemo(() => {
-    const active = employeesList.filter((e) => e.status === "active").length;
-    const onLeave = employeesList.filter((e) => e.status === "on_leave").length;
-    const inactive = employeesList.filter((e) => e.status === "inactive" || e.status === "terminated").length;
-    return {
-      total: employeesList.length,
-      active,
-      onLeave,
-      inactive,
-    };
-  }, [employeesList]);
+    return serverEmployees?.employees || [];
+  }, [serverEmployees]);
 
   // Handle open Add Modal
   const handleOpenAdd = () => {
@@ -886,53 +769,11 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* Top statistics panel */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-slate-100 bg-white shadow-xs">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Headcount</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.total}</h3>
-            </div>
-            <div className="h-10 w-10 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600">
-              <Users className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-100 bg-white shadow-xs">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Active Staff</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.active}</h3>
-            </div>
-            <div className="h-10 w-10 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-              <UserCheck className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-100 bg-white shadow-xs">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">On Leave</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.onLeave}</h3>
-            </div>
-            <div className="h-10 w-10 rounded-lg bg-amber-50 flex items-center justify-center text-amber-600">
-              <AlertCircle className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="border-slate-100 bg-white shadow-xs">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Inactive</p>
-              <h3 className="text-2xl font-bold text-slate-900 mt-1">{stats.inactive}</h3>
-            </div>
-            <div className="h-10 w-10 rounded-lg bg-rose-50 flex items-center justify-center text-rose-600">
-              <UserX className="h-5 w-5" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Top statistics dashboard */}
+      <EmployeeSummaryDashboard
+        filterParams={summaryFilterParams}
+        onSummaryChange={setSummary}
+      />
 
       {/* Main search, filter toolbar, and layout */}
       <div className="space-y-4">
