@@ -22,7 +22,7 @@ export type Employee = {
   state?: string;
   country?: string;
   zipCode?: string;
-  status: "active" | "inactive" | "terminated" | "on_leave";
+  status: "active" | "inactive" | "terminated" | "on_leave" | "suspended";
   employmentType?: "full_time" | "part_time" | "contract" | "intern";
   userId?: string;
   companyId: string;
@@ -151,7 +151,17 @@ export type CreateEmployeeData = {
 };
 
 export type UpdateEmployeeData = Partial<CreateEmployeeData> & {
-  status?: "active" | "inactive" | "terminated" | "on_leave";
+  status?: "active" | "inactive" | "terminated" | "on_leave" | "suspended";
+};
+
+export type SuspendEmployeeData = {
+  reason: string;
+  expectedReinstatement?: string;
+  notes?: string;
+};
+
+export type ReinstateEmployeeData = {
+  notes?: string;
 };
 
 export type EmployeeSearchParams = ListParams & {

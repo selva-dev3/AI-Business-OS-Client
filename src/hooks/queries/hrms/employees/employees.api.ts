@@ -7,6 +7,8 @@ import {
   UpdateEmployeeData,
   EmployeeSearchParams,
   BulkImportResponse,
+  SuspendEmployeeData,
+  ReinstateEmployeeData,
 } from "./employees.types";
 
 const BASE = "/hrms/employees";
@@ -26,6 +28,10 @@ export const employeesApi = {
   deletePermanent: (id: string) => apiDelete<{ message: string }>(`${BASE}/${id}/permanent`),
 
   activate: (id: string) => apiPost<{ message: string }>(`${BASE}/${id}/activate`),
+
+  suspend: (id: string, data: SuspendEmployeeData) => apiPatch<Employee>(`${BASE}/${id}/suspend`, data),
+
+  reinstate: (id: string, data: ReinstateEmployeeData) => apiPatch<Employee>(`${BASE}/${id}/reinstate`, data),
 
   bulkImport: (file: File) => {
     const formData = new FormData();

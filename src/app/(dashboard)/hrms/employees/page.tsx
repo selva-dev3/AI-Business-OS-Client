@@ -25,6 +25,8 @@ import {
   Loader2,
   X,
   ChevronDown,
+  OctagonAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -53,10 +55,13 @@ import {
   useBulkImportEmployees,
   useActivateEmployee,
   useDeleteEmployeePermanent,
+  useSuspendEmployee,
+  useReinstateEmployee,
 } from "@/hooks/queries/hrms/employees/employees.hooks";
 import { useDepartments } from "@/hooks/queries/hrms/departments/departments.hooks";
 import { Employee, CreateEmployeeData, UpdateEmployeeData, ProcessedSummary } from "@/hooks/queries/hrms/employees/employees.types";
 import { EmployeeSummaryDashboard } from "@/components/hrms/employee/EmployeeSummaryDashboard";
+import { SuspendEmployeeModal } from "@/components/hrms/employee/SuspendEmployeeModal";
 import { employeesApi } from "@/hooks/queries/hrms/employees/employees.api";
 import { apiGet } from "@/hooks/queries/client";
 import { DataTable, Column } from "@/components/shared/datatable";
@@ -78,10 +83,12 @@ export default function EmployeesPage() {
   const [isAddEditOpen, setIsAddEditOpen] = React.useState(false);
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
+  const [isSuspendOpen, setIsSuspendOpen] = React.useState(false);
 
-  // Selected employee for editing or deletion
+  // Selected employee for editing, deletion, or suspension
   const [editingEmployee, setEditingEmployee] = React.useState<Employee | null>(null);
   const [deletingEmployee, setDeletingEmployee] = React.useState<Employee | null>(null);
+  const [suspendingEmployee, setSuspendingEmployee] = React.useState<Employee | null>(null);
 
   // Form state
   const [formValues, setFormValues] = React.useState<Partial<Employee>>({
@@ -251,6 +258,8 @@ export default function EmployeesPage() {
   const importMutation = useBulkImportEmployees();
   const activateMutation = useActivateEmployee();
   const deletePermanentMutation = useDeleteEmployeePermanent();
+  const suspendMutation = useSuspendEmployee();
+  const reinstateMutation = useReinstateEmployee();
 
   // Fetch departments dynamically
   const { data: dbDepartments } = useDepartments();
@@ -439,6 +448,37 @@ export default function EmployeesPage() {
     }
   };
 
+  const handleOpenSuspend = (emp: Employee) => {
+    setSuspendingEmployee(emp);
+    setIsSuspendOpen(true);
+  };
+
+  const handleConfirmSuspend = async (data: { reason: string; expectedReinstatement?: string; notes?: string }) => {
+    if (!suspendingEmployee) return;
+    try {
+      await suspendMutation.mutateAsync({ id: suspendingEmployee.id, data });
+      toast.success(`${suspendingEmployee.firstName} ${suspendingEmployee.lastName} has been suspended`);
+      setIsSuspendOpen(false);
+      refetch();
+    } catch (err: any) {
+      console.error("Failed to suspend:", err);
+      const errMsg = err?.response?.data?.message || err?.message || "Failed to suspend employee";
+      toast.error(errMsg);
+    }
+  };
+
+  const handleReinstate = async (emp: Employee) => {
+    try {
+      await reinstateMutation.mutateAsync({ id: emp.id, data: {} });
+      toast.success(`${emp.firstName} ${emp.lastName} has been reinstated`);
+      refetch();
+    } catch (err: any) {
+      console.error("Failed to reinstate:", err);
+      const errMsg = err?.response?.data?.message || err?.message || "Failed to reinstate employee";
+      toast.error(errMsg);
+    }
+  };
+
   const handlePermanentDelete = async (emp: Employee) => {
     if (emp.status === "active") {
       toast.error("Cannot permanently delete an active employee. Deactivate first.");
@@ -589,6 +629,8 @@ export default function EmployeesPage() {
         return <Badge className="bg-slate-50 text-slate-700 border-slate-200">Inactive</Badge>;
       case "terminated":
         return <Badge className="bg-rose-50 text-rose-700 border-rose-200">Terminated</Badge>;
+      case "suspended":
+        return <Badge className="bg-rose-50 text-rose-700 border-rose-200">Suspended</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -694,6 +736,26 @@ export default function EmployeesPage() {
               <Edit2 className="mr-2 h-3.5 w-3.5 text-slate-400" />
               Edit details
             </DropdownMenuItem>
+
+            {emp.status !== "suspended" && (
+              <DropdownMenuItem
+                onClick={() => handleOpenSuspend(emp)}
+                className="text-xs font-semibold text-amber-700 focus:text-amber-700 focus:bg-amber-50 cursor-pointer flex items-center px-2 py-1.5 rounded-sm"
+              >
+                <OctagonAlert className="mr-2 h-3.5 w-3.5 text-amber-500" />
+                Suspend Employee
+              </DropdownMenuItem>
+            )}
+
+            {emp.status === "suspended" && (
+              <DropdownMenuItem
+                onClick={() => handleReinstate(emp)}
+                className="text-xs font-semibold text-emerald-700 focus:text-emerald-700 focus:bg-emerald-50 cursor-pointer flex items-center px-2 py-1.5 rounded-sm"
+              >
+                <ShieldCheck className="mr-2 h-3.5 w-3.5 text-emerald-500" />
+                Reinstate Employee
+              </DropdownMenuItem>
+            )}
 
             {emp.status === "active" ? (
               <DropdownMenuItem
@@ -806,6 +868,7 @@ export default function EmployeesPage() {
                     <option value="on_leave">On Leave</option>
                     <option value="inactive">Inactive</option>
                     <option value="terminated">Terminated</option>
+                    <option value="suspended">Suspended</option>
                   </select>
 
                   {/* Department filter */}
@@ -1132,6 +1195,15 @@ export default function EmployeesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Suspend Employee Modal */}
+      <SuspendEmployeeModal
+        employee={suspendingEmployee}
+        open={isSuspendOpen}
+        onOpenChange={setIsSuspendOpen}
+        onConfirm={handleConfirmSuspend}
+        isPending={suspendMutation.isPending}
+      />
 
       {/* Delete Confirmation Dialog Modal */}
       <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
