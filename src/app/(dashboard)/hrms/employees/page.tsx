@@ -5,6 +5,7 @@ import {
   Users,
   UserCheck,
   UserX,
+  UserMinus,
   AlertCircle,
   Plus,
   Download,
@@ -57,11 +58,13 @@ import {
   useDeleteEmployeePermanent,
   useSuspendEmployee,
   useReinstateEmployee,
+  useTerminateEmployee,
 } from "@/hooks/queries/hrms/employees/employees.hooks";
 import { useDepartments } from "@/hooks/queries/hrms/departments/departments.hooks";
 import { Employee, CreateEmployeeData, UpdateEmployeeData, ProcessedSummary } from "@/hooks/queries/hrms/employees/employees.types";
 import { EmployeeSummaryDashboard } from "@/components/hrms/employee/EmployeeSummaryDashboard";
 import { SuspendEmployeeModal } from "@/components/hrms/employee/SuspendEmployeeModal";
+import { TerminateEmployeeModal } from "@/components/hrms/employee/TerminateEmployeeModal";
 import { employeesApi } from "@/hooks/queries/hrms/employees/employees.api";
 import { apiGet } from "@/hooks/queries/client";
 import { DataTable, Column } from "@/components/shared/datatable";
@@ -84,11 +87,13 @@ export default function EmployeesPage() {
   const [isImportOpen, setIsImportOpen] = React.useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = React.useState(false);
   const [isSuspendOpen, setIsSuspendOpen] = React.useState(false);
+  const [isTerminateOpen, setIsTerminateOpen] = React.useState(false);
 
   // Selected employee for editing, deletion, or suspension
   const [editingEmployee, setEditingEmployee] = React.useState<Employee | null>(null);
   const [deletingEmployee, setDeletingEmployee] = React.useState<Employee | null>(null);
   const [suspendingEmployee, setSuspendingEmployee] = React.useState<Employee | null>(null);
+  const [terminatingEmployee, setTerminatingEmployee] = React.useState<Employee | null>(null);
 
   // Form state
   const [formValues, setFormValues] = React.useState<Partial<Employee>>({
@@ -260,6 +265,7 @@ export default function EmployeesPage() {
   const deletePermanentMutation = useDeleteEmployeePermanent();
   const suspendMutation = useSuspendEmployee();
   const reinstateMutation = useReinstateEmployee();
+  const terminateMutation = useTerminateEmployee();
 
   // Fetch departments dynamically
   const { data: dbDepartments } = useDepartments();
@@ -463,6 +469,25 @@ export default function EmployeesPage() {
     } catch (err: any) {
       console.error("Failed to suspend:", err);
       const errMsg = err?.response?.data?.message || err?.message || "Failed to suspend employee";
+      toast.error(errMsg);
+    }
+  };
+
+  const handleOpenTerminate = (emp: Employee) => {
+    setTerminatingEmployee(emp);
+    setIsTerminateOpen(true);
+  };
+
+  const handleConfirmTerminate = async (data: any) => {
+    if (!terminatingEmployee) return;
+    try {
+      await terminateMutation.mutateAsync({ id: terminatingEmployee.id, data });
+      toast.success(`${terminatingEmployee.firstName} ${terminatingEmployee.lastName} has been terminated`);
+      setIsTerminateOpen(false);
+      refetch();
+    } catch (err: any) {
+      console.error("Failed to terminate:", err);
+      const errMsg = err?.response?.data?.message || err?.message || "Failed to terminate employee";
       toast.error(errMsg);
     }
   };
@@ -775,6 +800,16 @@ export default function EmployeesPage() {
               </DropdownMenuItem>
             ) : null}
 
+            {emp.status !== "terminated" && (
+              <DropdownMenuItem
+                onClick={() => handleOpenTerminate(emp)}
+                className="text-xs font-semibold text-rose-700 focus:text-rose-700 focus:bg-rose-50 cursor-pointer flex items-center px-2 py-1.5 rounded-sm"
+              >
+                <UserMinus className="mr-2 h-3.5 w-3.5 text-rose-500" />
+                Terminate Employee
+              </DropdownMenuItem>
+            )}
+
             <DropdownMenuItem
               onClick={() => handlePermanentDelete(emp)}
               className="text-xs font-semibold text-rose-600 focus:text-rose-600 focus:bg-rose-50 cursor-pointer flex items-center px-2 py-1.5 rounded-sm"
@@ -835,6 +870,7 @@ export default function EmployeesPage() {
       <EmployeeSummaryDashboard
         filterParams={summaryFilterParams}
         onSummaryChange={setSummary}
+        onFilterByStatus={(status) => setStatusFilter(status)}
       />
 
       {/* Main search, filter toolbar, and layout */}
@@ -1203,6 +1239,15 @@ export default function EmployeesPage() {
         onOpenChange={setIsSuspendOpen}
         onConfirm={handleConfirmSuspend}
         isPending={suspendMutation.isPending}
+      />
+
+      {/* Terminate Employee Modal */}
+      <TerminateEmployeeModal
+        employee={terminatingEmployee}
+        open={isTerminateOpen}
+        onOpenChange={setIsTerminateOpen}
+        onConfirm={handleConfirmTerminate}
+        isPending={terminateMutation.isPending}
       />
 
       {/* Delete Confirmation Dialog Modal */}

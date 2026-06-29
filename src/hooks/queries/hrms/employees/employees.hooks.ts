@@ -7,6 +7,7 @@ import {
   EmployeeSearchParams,
   SuspendEmployeeData,
   ReinstateEmployeeData,
+  TerminateEmployeeData,
 } from "./employees.types";
 
 export function useEmployees(params?: EmployeeSearchParams) {
@@ -80,6 +81,17 @@ export function useReinstateEmployee() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: ReinstateEmployeeData }) => employeesApi.reinstate(id, data),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: employeesKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: employeesKeys.all });
+    },
+  });
+}
+
+export function useTerminateEmployee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: TerminateEmployeeData }) => employeesApi.terminate(id, data),
     onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: employeesKeys.detail(id) });
       qc.invalidateQueries({ queryKey: employeesKeys.all });

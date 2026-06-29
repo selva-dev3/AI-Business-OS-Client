@@ -9,6 +9,7 @@ export const getStatusBadge = (status = "active") => {
     inactive: "Inactive",
     terminated: "Terminated",
     on_leave: "On Leave",
+    suspended: "Suspended",
   };
   const styles: Record<string, string> = {
     active:
@@ -19,6 +20,8 @@ export const getStatusBadge = (status = "active") => {
       "bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/30",
     on_leave:
       "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/30",
+    suspended:
+      "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/20 dark:text-red-400 dark:border-red-900/30",
   };
   return (
     <Badge

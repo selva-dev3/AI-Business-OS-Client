@@ -19,11 +19,13 @@ import { SharedCard } from "@/components/shared/sharedCard";
 interface EmployeeSummaryDashboardProps {
   filterParams: EmployeeSearchParams;
   onSummaryChange?: (summary: ProcessedSummary) => void;
+  onFilterByStatus?: (status: string) => void;
 }
 
 export const EmployeeSummaryDashboard: React.FC<EmployeeSummaryDashboardProps> = ({
   filterParams,
   onSummaryChange,
+  onFilterByStatus,
 }) => {
   const { summary, loading, error, refetch } = useSummaryData({
     filterParams,
@@ -48,7 +50,7 @@ export const EmployeeSummaryDashboard: React.FC<EmployeeSummaryDashboardProps> =
   }
 
   if (summary) {
-    return <SummaryStatsGrid summary={summary} />;
+    return <SummaryStatsGrid summary={summary} onFilterByStatus={onFilterByStatus} />;
   }
 
   return null;
@@ -61,7 +63,7 @@ export const EmployeeSummaryDashboard: React.FC<EmployeeSummaryDashboardProps> =
 /**
  * Renders the 5 status summary cards
  */
-const SummaryStatsGrid: React.FC<{ summary: ProcessedSummary }> = ({ summary }) => {
+const SummaryStatsGrid: React.FC<{ summary: ProcessedSummary; onFilterByStatus?: (status: string) => void }> = ({ summary, onFilterByStatus }) => {
   const cardMetrics = SummaryTransformer.toCardMetrics(summary);
 
   const getCardDetails = (label: string) => {
@@ -123,6 +125,13 @@ const SummaryStatsGrid: React.FC<{ summary: ProcessedSummary }> = ({ summary }) 
 
         const description = card.label === "Total Headcount" ? "Active workforce size" : undefined;
 
+        const statusMap: Record<string, string> = {
+          "Active Staff": "active",
+          "On Leave": "on_leave",
+          "Inactive": "inactive",
+          "Suspended": "suspended",
+        };
+
         return (
           <SharedCard
             key={card.label}
@@ -133,6 +142,7 @@ const SummaryStatsGrid: React.FC<{ summary: ProcessedSummary }> = ({ summary }) 
             iconColor={iconColor}
             trend={trend}
             description={description}
+            onClick={statusMap[card.label] ? () => onFilterByStatus?.(statusMap[card.label]) : undefined}
           />
         );
       })}

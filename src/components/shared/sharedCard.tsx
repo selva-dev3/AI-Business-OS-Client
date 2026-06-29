@@ -15,6 +15,7 @@ export interface SharedCardProps {
   };
   description?: string;
   className?: string;
+  onClick?: () => void;
 }
 
 export const SharedCard: React.FC<SharedCardProps> = ({
@@ -26,9 +27,17 @@ export const SharedCard: React.FC<SharedCardProps> = ({
   trend,
   description,
   className,
+  onClick,
 }) => {
   return (
-    <div className={cn("bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow", className)}>
+    <div
+      onClick={onClick}
+      className={cn(
+        "bg-white rounded-xl border border-slate-200 p-5 hover:shadow-md transition-shadow",
+        onClick && "cursor-pointer",
+        className
+      )}
+    >
       <div className="flex items-start justify-between">
         <div className="flex-1">
           <p className="text-sm font-medium text-slate-500">{title}</p>
