@@ -44,7 +44,6 @@ import {
 import {
   useAttendanceList,
   useAttendanceSummary,
-  useCheckIn,
   useCheckOut,
   useUpdateAttendance,
   useCreateAttendance,
@@ -53,6 +52,8 @@ import { AttendanceRecord, AttendanceStatus } from "@/hooks/queries/hrms/attenda
 import { useEmployees } from "@/hooks/queries/hrms/employees/employees.hooks";
 import { useDepartments } from "@/hooks/queries/hrms/departments/departments.hooks";
 import { DataTable, Column } from "@/components/shared/datatable";
+import { AttendanceCheckInButton } from "@/components/hrms/attendance/AttendanceCheckInButton";
+import { AttendanceCheckInDialog } from "@/components/hrms/attendance/AttendanceCheckInDialog";
 
 // Normalize database attendance record structure to frontend representation
 const normalizeAttendance = (record: any): AttendanceRecord => {
@@ -99,7 +100,14 @@ export default function AttendancePage() {
   // Modals state
   const [isEditOpen, setIsEditOpen] = React.useState(false);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
+  const [isCheckInOpen, setIsCheckInOpen] = React.useState(false);
   const [editingRecord, setEditingRecord] = React.useState<AttendanceRecord | null>(null);
+  const [checkInEmployee, setCheckInEmployee] = React.useState<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeCode?: string;
+  } | null>(null);
 
   // Form override values
   const [formValues, setFormValues] = React.useState({
@@ -184,7 +192,6 @@ export default function AttendancePage() {
     search: searchQuery || undefined,
   });
 
-  const checkInMutation = useCheckIn();
   const checkOutMutation = useCheckOut();
   const updateMutation = useUpdateAttendance(editingRecord?.id || "");
   const createMutation = useCreateAttendance();
@@ -414,32 +421,45 @@ export default function AttendancePage() {
   }, [attendanceList]);
 
 
-  // Handle user check-in button click
-  const handleCheckIn = async () => {
-    try {
-      const nowStr = new Date().toISOString();
-      await checkInMutation.mutateAsync({ notes: "Web Check-In" });
-      
-      setCurrentUserStatus({
-        checkedIn: true,
-        checkInTime: nowStr,
-        checkOutTime: null,
-        totalHours: 0,
+  // Open check-in dialog for workstation (defaults to first available employee)
+  const handleOpenWorkstationCheckIn = React.useCallback(() => {
+    const firstEmp = employeesData?.employees?.[0] || employeesData?.data?.[0];
+    if (firstEmp) {
+      setCheckInEmployee({
+        id: firstEmp.id,
+        firstName: firstEmp.firstName,
+        lastName: firstEmp.lastName,
+        employeeCode: firstEmp.employeeCode || firstEmp.employeeId,
       });
-      toast.success("Clocked in successfully!");
-      refetch();
-    } catch (err) {
-      // Mock local check-in
-      const nowStr = new Date().toISOString();
-      setCurrentUserStatus({
-        checkedIn: true,
-        checkInTime: nowStr,
-        checkOutTime: null,
-        totalHours: 0,
-      });
-      toast.success("Clocked in successfully (Mock mode)!");
     }
-  };
+    setIsCheckInOpen(true);
+  }, [employeesData]);
+
+  // Open check-in dialog for a specific employee
+  const handleOpenEmployeeCheckIn = React.useCallback((record: AttendanceRecord) => {
+    const emp = record.employee;
+    if (emp) {
+      setCheckInEmployee({
+        id: emp.id,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        employeeCode: (emp as Record<string, unknown>).employeeCode as string | undefined,
+      });
+    }
+    setIsCheckInOpen(true);
+  }, []);
+
+  // Handle successful check-in from dialog
+  const handleCheckInSuccess = React.useCallback((checkInTimeISO?: string) => {
+    const timeStr = checkInTimeISO || new Date().toISOString();
+    setCurrentUserStatus({
+      checkedIn: true,
+      checkInTime: timeStr,
+      checkOutTime: null,
+      totalHours: 0,
+    });
+    refetch();
+  }, [refetch]);
 
   // Handle user check-out button click
   const handleCheckOut = async () => {
@@ -716,22 +736,34 @@ export default function AttendancePage() {
     },
     {
       header: "Actions",
-      cell: (record) => (
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleOpenEdit(record);
-          }}
-          className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
-        >
-          <Edit2 className="h-3.5 w-3.5" />
-        </Button>
-      ),
+      cell: (record) => {
+        const noCheckIn = !record.checkIn && record.status !== "on_leave";
+        return (
+          <div className="flex items-center justify-center gap-1">
+            {noCheckIn && (
+              <AttendanceCheckInButton
+                onClick={() => handleOpenEmployeeCheckIn(record)}
+                variant="ghost"
+                className="h-8 px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 text-[11px] font-semibold"
+              />
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenEdit(record);
+              }}
+              className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
+            >
+              <Edit2 className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        );
+      },
       className: "py-3.5 px-6 text-center",
     },
-  ], [departments, handleOpenEdit]);
+  ], [departments, handleOpenEdit, handleOpenEmployeeCheckIn]);
 
   return (
     <div className="p-6 space-y-6 w-full">
@@ -805,13 +837,14 @@ export default function AttendancePage() {
 
             <div className="flex gap-2">
               {!currentUserStatus.checkedIn ? (
-                <Button
-                  onClick={handleCheckIn}
-                  className="flex-1 bg-indigo-600 text-white hover:bg-indigo-700 font-semibold shadow-xs flex items-center justify-center gap-2"
+                <AttendanceCheckInButton
+                  onClick={handleOpenWorkstationCheckIn}
+                  variant="default"
+                  className="flex-1 bg-indigo-600 text-white hover:bg-indigo-700 font-semibold shadow-xs"
                 >
                   <Play className="h-4 w-4 fill-white" />
                   Check In
-                </Button>
+                </AttendanceCheckInButton>
               ) : (
                 <Button
                   onClick={handleCheckOut}
@@ -1005,6 +1038,14 @@ export default function AttendancePage() {
           />
         </CardContent>
       </Card>
+
+      {/* Attendance Check-In Dialog */}
+      <AttendanceCheckInDialog
+        employee={checkInEmployee}
+        open={isCheckInOpen}
+        onOpenChange={setIsCheckInOpen}
+        onSuccess={handleCheckInSuccess}
+      />
 
       {/* Edit Override Log Modal */}
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

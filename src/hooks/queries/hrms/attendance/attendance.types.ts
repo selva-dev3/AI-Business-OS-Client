@@ -64,3 +64,13 @@ export type UpdateAttendanceRequest = {
   status?: AttendanceStatus | string;
   notes?: string;
 };
+
+export type CheckInFormData = {
+  employeeId: string;
+  attendanceDate: string;
+  checkIn: string;
+  attendanceType: "PRESENT" | "LATE" | "HALF_DAY";
+  shift?: string;
+  workLocation?: string;
+  remarks?: string;
+};

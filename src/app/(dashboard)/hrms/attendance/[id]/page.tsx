@@ -17,6 +17,8 @@ import {
   TrendingUp,
   MapPin,
   Edit2,
+  Play,
+  Square,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -34,8 +36,10 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-import { useAttendanceDetails, useUpdateAttendance } from "@/hooks/queries/hrms/attendance/attendance.hooks";
+import { useAttendanceDetails, useUpdateAttendance, useCheckOut } from "@/hooks/queries/hrms/attendance/attendance.hooks";
 import { useDepartments } from "@/hooks/queries/hrms/departments/departments.hooks";
+import { useEmployees } from "@/hooks/queries/hrms/employees/employees.hooks";
+import { AttendanceCheckInDialog } from "@/components/hrms/attendance/AttendanceCheckInDialog";
 import { AttendanceRecord, AttendanceStatus } from "@/hooks/queries/hrms/attendance/attendance.types";
 
 // Normalize database attendance record structure to frontend representation
@@ -80,7 +84,197 @@ export default function AttendanceDetailPage() {
   const { data: dbDepartments } = useDepartments();
   const departments = dbDepartments || [];
 
+  const record = React.useMemo<AttendanceRecord | null>(() => {
+    if (!serverRecord) return null;
+    // Server wraps data inside record or the root response is the record itself
+    const raw = (serverRecord as any).data || serverRecord;
+    return normalizeAttendance(raw);
+  }, [serverRecord]);
+
   const updateMutation = useUpdateAttendance(id);
+  const { data: employeesData } = useEmployees();
+  const checkOutMutation = useCheckOut();
+
+  const [isCheckInOpen, setIsCheckInOpen] = React.useState(false);
+  const [checkInEmployee, setCheckInEmployee] = React.useState<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeCode?: string;
+  } | null>(null);
+
+  // Current user's own clock-in status (local simulation)
+  const [currentUserStatus, setCurrentUserStatus] = React.useState<{
+    checkedIn: boolean;
+    checkInTime: string | null;
+    checkOutTime: string | null;
+    totalHours: number;
+  }>(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("hrms_user_attendance");
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    }
+    return {
+      checkedIn: false,
+      checkInTime: null,
+      checkOutTime: null,
+      totalHours: 0,
+    };
+  });
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("hrms_user_attendance", JSON.stringify(currentUserStatus));
+    }
+  }, [currentUserStatus]);
+
+  const [timerText, setTimerText] = React.useState("00:00:00");
+  const [currentTimeText, setCurrentTimeText] = React.useState("");
+
+  React.useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentTimeText(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+
+      if (currentUserStatus.checkedIn && currentUserStatus.checkInTime) {
+        const diffMs = now.getTime() - new Date(currentUserStatus.checkInTime).getTime();
+        const sec = Math.floor((diffMs / 1000) % 60);
+        const min = Math.floor((diffMs / 60000) % 60);
+        const hrs = Math.floor((diffMs / 3600000) % 24);
+        setTimerText(
+          `${String(hrs).padStart(2, "0")}:${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+        );
+      }
+    };
+
+    updateTime();
+    const interval = setInterval(updateTime, 1000);
+    return () => clearInterval(interval);
+  }, [currentUserStatus]);
+
+  const isRecordCheckedIn = React.useMemo(() => {
+    return !!record?.checkIn && !record?.checkOut;
+  }, [record]);
+
+  const [recordTimerText, setRecordTimerText] = React.useState("00:00:00");
+
+  React.useEffect(() => {
+    const updateRecordTimer = () => {
+      if (isRecordCheckedIn && record?.checkIn) {
+        const diffMs = new Date().getTime() - new Date(record.checkIn).getTime();
+        if (diffMs > 0) {
+          const sec = Math.floor((diffMs / 1000) % 60);
+          const min = Math.floor((diffMs / 60000) % 60);
+          const hrs = Math.floor(diffMs / 3600000);
+          setRecordTimerText(
+            `${String(hrs).padStart(2, "0")}:${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+          );
+        } else {
+          setRecordTimerText("00:00:00");
+        }
+      }
+    };
+
+    updateRecordTimer();
+    const interval = setInterval(updateRecordTimer, 1000);
+    return () => clearInterval(interval);
+  }, [isRecordCheckedIn, record?.checkIn]);
+
+  const handleOpenWorkstationCheckIn = React.useCallback(() => {
+    // Default to the current page's employee if available, else first employee in list
+    const currentEmp = record?.employee;
+    const firstEmp: any = currentEmp || employeesData?.employees?.[0] || employeesData?.data?.[0];
+    if (firstEmp) {
+      setCheckInEmployee({
+        id: firstEmp.id || firstEmp._id,
+        firstName: firstEmp.firstName,
+        lastName: firstEmp.lastName,
+        employeeCode: firstEmp.employeeCode || firstEmp.employeeId,
+      });
+    }
+    setIsCheckInOpen(true);
+  }, [employeesData, record]);
+
+  const handleCheckInSuccess = React.useCallback((checkInTimeISO?: string) => {
+    const timeStr = checkInTimeISO || new Date().toISOString();
+    setCurrentUserStatus({
+      checkedIn: true,
+      checkInTime: timeStr,
+      checkOutTime: null,
+      totalHours: 0,
+    });
+    refetch();
+  }, [refetch]);
+
+  const handleRecordCheckIn = async () => {
+    if (!record) return;
+    try {
+      const nowStr = new Date().toISOString();
+      await updateMutation.mutateAsync({
+        checkIn: nowStr,
+        status: "PRESENT",
+        notes: record.notes || "Workstation Check-In",
+      });
+      toast.success("Checked in successfully!");
+      refetch();
+    } catch (err: any) {
+      const serverMsg = err?.response?.data?.message || err?.message;
+      toast.error(serverMsg || "Failed to check in");
+    }
+  };
+
+  const handleRecordCheckOut = async () => {
+    if (!record) return;
+    try {
+      const nowStr = new Date().toISOString();
+      await updateMutation.mutateAsync({
+        checkIn: record.checkIn,
+        checkOut: nowStr,
+        status: record.status.toUpperCase() as AttendanceStatus,
+        notes: record.notes || "Workstation Check-Out",
+      });
+      toast.success("Checked out successfully!");
+      refetch();
+    } catch (err: any) {
+      const serverMsg = err?.response?.data?.message || err?.message;
+      toast.error(serverMsg || "Failed to check out");
+    }
+  };
+
+  const handleCheckOut = async () => {
+    try {
+      await checkOutMutation.mutateAsync({ notes: "Web Check-Out" });
+      const checkInDate = currentUserStatus.checkInTime ? new Date(currentUserStatus.checkInTime) : new Date();
+      const checkOutDate = new Date();
+      const diffMs = checkOutDate.getTime() - checkInDate.getTime();
+      const hours = Math.round((diffMs / 3600000) * 100) / 100;
+
+      setCurrentUserStatus((prev) => ({
+        ...prev,
+        checkedIn: false,
+        checkOutTime: checkOutDate.toISOString(),
+        totalHours: hours,
+      }));
+      toast.success("Clocked out successfully!");
+      refetch();
+    } catch (err) {
+      // Mock local check-out
+      const checkInDate = currentUserStatus.checkInTime ? new Date(currentUserStatus.checkInTime) : new Date();
+      const checkOutDate = new Date();
+      const diffMs = checkOutDate.getTime() - checkInDate.getTime();
+      const hours = Math.round((diffMs / 3600000) * 100) / 100;
+
+      setCurrentUserStatus((prev) => ({
+        ...prev,
+        checkedIn: false,
+        checkOutTime: checkOutDate.toISOString(),
+        totalHours: hours,
+      }));
+      toast.success("Clocked out successfully (Mock mode)!");
+    }
+  };
 
   // Modal & form state
   const [isEditOpen, setIsEditOpen] = React.useState(false);
@@ -91,12 +285,6 @@ export default function AttendanceDetailPage() {
     notes: "",
   });
 
-  const record = React.useMemo<AttendanceRecord | null>(() => {
-    if (!serverRecord) return null;
-    // Server wraps data inside record or the root response is the record itself
-    const raw = (serverRecord as any).data || serverRecord;
-    return normalizeAttendance(raw);
-  }, [serverRecord]);
 
   // Set form default values when opening the modal
   const handleOpenEdit = () => {
@@ -279,6 +467,80 @@ export default function AttendanceDetailPage() {
                 </span>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Live workstation clocking panel */}
+        <Card className="border-indigo-100 bg-indigo-50/40 relative overflow-hidden shadow-xs rounded-xl mt-4">
+          <div className="absolute right-[-10px] top-[-10px] opacity-10">
+            <Clock className="h-32 w-32 text-indigo-700" />
+          </div>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-bold uppercase tracking-wider text-indigo-900">
+              Clock Workstation
+            </CardTitle>
+            <CardDescription className="text-xs text-indigo-700/80">
+              Current local workstation session.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pt-1">
+            <div className="text-center py-2">
+              <h2 className="text-3xl font-extrabold text-slate-900 font-mono tracking-tight">
+                {currentTimeText || "--:--:--"}
+              </h2>
+              {currentUserStatus.checkedIn ? (
+                <div className="flex items-center justify-center gap-2 mt-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-xs font-semibold text-emerald-700">
+                    Logged: {timerText}
+                  </span>
+                </div>
+              ) : (
+                <p className="text-xs font-medium text-slate-500 mt-2">
+                  Ready to clock check-in record
+                </p>
+              )}
+            </div>
+
+            <div className="flex gap-2">
+              {!currentUserStatus.checkedIn ? (
+                <Button
+                  onClick={handleOpenWorkstationCheckIn}
+                  className="flex-1 bg-indigo-600 text-white hover:bg-indigo-700 font-semibold shadow-xs flex items-center justify-center gap-2"
+                >
+                  <Play className="h-4 w-4 fill-white" />
+                  Check In
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleCheckOut}
+                  variant="destructive"
+                  className="flex-1 bg-red-600 hover:bg-red-700 font-semibold shadow-xs flex items-center justify-center gap-2"
+                >
+                  <Square className="h-4 w-4 fill-white" />
+                  Check Out
+                </Button>
+              )}
+            </div>
+
+            {currentUserStatus.checkInTime && (
+              <div className="border-t border-indigo-100/60 pt-3 text-[11px] text-slate-500 space-y-1">
+                <div className="flex justify-between">
+                  <span>Checked In:</span>
+                  <span className="font-semibold text-slate-800">
+                    {new Date(currentUserStatus.checkInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                {currentUserStatus.checkOutTime && (
+                  <div className="flex justify-between">
+                    <span>Checked Out:</span>
+                    <span className="font-semibold text-slate-800">
+                      {new Date(currentUserStatus.checkOutTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -466,6 +728,14 @@ export default function AttendanceDetailPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Attendance Check-In Dialog */}
+      <AttendanceCheckInDialog
+        employee={checkInEmployee}
+        open={isCheckInOpen}
+        onOpenChange={setIsCheckInOpen}
+        onSuccess={handleCheckInSuccess}
+      />
     </div>
   );
 }
