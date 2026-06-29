@@ -8,6 +8,7 @@ import {
   SuspendEmployeeData,
   ReinstateEmployeeData,
   TerminateEmployeeData,
+  EmployeeHistoryItem,
 } from "./employees.types";
 
 export function useEmployees(params?: EmployeeSearchParams) {
@@ -115,5 +116,13 @@ export function useBulkImportEmployees() {
   return useMutation({
     mutationFn: (file: File) => employeesApi.bulkImport(file),
     onSuccess: () => qc.invalidateQueries({ queryKey: employeesKeys.all }),
+  });
+}
+
+export function useEmployeeHistory(id: string) {
+  return useQuery({
+    queryKey: [...employeesKeys.detail(id), "history"] as const,
+    queryFn: () => employeesApi.getHistory(id),
+    enabled: !!id,
   });
 }

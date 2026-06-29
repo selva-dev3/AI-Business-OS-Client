@@ -339,7 +339,7 @@ export default function LeavePage() {
     setEmployeesLoading(true);
     try {
       const employeesRes = await leaveApi.getEmployees();
-      setEmployees(employeesRes?.data || []);
+      setEmployees(employeesRes?.employees || employeesRes?.data || []);
     } catch (err) {
       setEmployees([]);
     } finally {

@@ -11,6 +11,7 @@ import {
   Briefcase,
   Key,
   LogOut,
+  History,
   type LucideIcon,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
@@ -24,6 +25,7 @@ export type EmployeeTabKey =
   | "payroll"
   | "documents"
   | "notes"
+  | "history"
   | "assign-role"
   | "access"
   | "exit";
@@ -42,6 +44,7 @@ const ALL_TABS: TabDef[] = [
   { key: "payroll", label: "Payroll", icon: Banknote, roles: ["admin", "hr_manager", "employee"] },
   { key: "documents", label: "Documents", icon: FileText, roles: ["admin", "hr_manager", "employee"] },
   { key: "notes", label: "HR Notes", icon: StickyNote, roles: ["admin", "hr_manager", "employee"] },
+  { key: "history", label: "History", icon: History, roles: ["admin", "hr_manager", "employee"] },
   { key: "assign-role", label: "Role & Dept", icon: Briefcase, roles: ["admin", "hr_manager"] },
   { key: "access", label: "Access", icon: Key, roles: ["admin"] },
   { key: "exit", label: "Exit / Offboard", icon: LogOut, roles: ["admin"] },

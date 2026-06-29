@@ -21,6 +21,7 @@ const LeaveTab = React.lazy(() => import("@/components/hrms/employee/tabs/LeaveT
 const PayrollTab = React.lazy(() => import("@/components/hrms/employee/tabs/PayrollTab"));
 const DocumentsTab = React.lazy(() => import("@/components/hrms/employee/tabs/DocumentsTab"));
 const NotesTab = React.lazy(() => import("@/components/hrms/employee/tabs/NotesTab"));
+const HistoryTab = React.lazy(() => import("@/components/hrms/employee/tabs/HistoryTab"));
 const RoleTab = React.lazy(() => import("@/components/hrms/employee/tabs/RoleTab"));
 const AccessTab = React.lazy(() => import("@/components/hrms/employee/tabs/AccessTab"));
 const ExitTab = React.lazy(() => import("@/components/hrms/employee/tabs/ExitTab"));
@@ -202,6 +203,11 @@ export default function EmployeeDetailPage() {
           {mountedTabs.has("notes") && (
             <div className={activeTab === "notes" ? "block" : "hidden"}>
               <NotesTab employeeId={id} />
+            </div>
+          )}
+          {mountedTabs.has("history") && (
+            <div className={activeTab === "history" ? "block" : "hidden"}>
+              <HistoryTab employeeId={id} />
             </div>
           )}
           {mountedTabs.has("assign-role") && (

@@ -191,6 +191,7 @@ export type EmployeeTabKey =
   | "payroll"
   | "documents"
   | "notes"
+  | "history"
   | "assign-role"
   | "access"
   | "exit";
