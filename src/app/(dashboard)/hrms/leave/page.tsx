@@ -52,6 +52,7 @@ import {
 import { LeaveRequest, LeaveBalance, LeaveType, LeaveStatus } from "@/hooks/queries/hrms/leave/leave.types";
 import { Employee } from "@/hooks/queries/hrms/employees/employees.types";
 import { leaveApi } from "@/hooks/queries/hrms/leave/leave.api";
+import { DataTable, Column } from "@/components/shared/datatable";
 
 export default function LeavePage() {
   const [activeTab, setActiveTab] = React.useState<"my-requests" | "team-approvals" | "outages">("my-requests");
@@ -59,7 +60,7 @@ export default function LeavePage() {
   // Search & Filter state
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("");
-  const [typeFilter, setTypeFilter] = React.useState<string>("");
+  const [typeFilter, setTypeFilter] = React.useState<string>(""); // leaveTypeId
 
   // Modals state
   const [isRequestOpen, setIsRequestOpen] = React.useState(false);
@@ -94,18 +95,17 @@ export default function LeavePage() {
   const [employees, setEmployees] = React.useState<Employee[]>([]);
   const [employeesLoading, setEmployeesLoading] = React.useState(false);
 
-  // Fetch from Tanstack React Query hooks
+  // Fetch from Tanstack React Query hooks — pass server-compatible filters
   const { data: serverRequests, isLoading, refetch } = useLeaveRequests({
     status: statusFilter || undefined,
-    leaveType: typeFilter || undefined,
-    search: searchQuery || undefined,
+    leaveTypeId: typeFilter || undefined,
   });
 
   const { data: serverBalances } = useLeaveBalances();
 
   const createRequestMutation = useCreateLeaveRequest();
   const approveMutation = useApproveLeave();
-  const rejectMutation = useApproveLeave(); // Wrapped internally or mocked
+  const rejectMutation = useRejectLeave();
   const cancelMutation = useCancelLeave();
 
   const { data: leaveTypes, isLoading: isLoadingLeaveTypes, isError: isLeaveTypesError } = useLeaveTypes();
@@ -120,195 +120,42 @@ export default function LeavePage() {
     { id: "dept-6", name: "Customer Support" },
   ];
 
-  // High-fidelity fallback leave balances
-  const fallbackBalances: LeaveBalance[] = React.useMemo(() => {
+  // Leave balances from API
+  const balancesList = React.useMemo(() => {
+    if (serverBalances && Array.isArray(serverBalances) && serverBalances.length > 0) {
+      return serverBalances;
+    }
+    // Fallback balances when API returns empty
     return [
-      { id: "bal-1", employeeId: "current-user", leaveType: "annual", totalAllocated: 20, used: 6, pending: 0, available: 14 },
-      { id: "bal-2", employeeId: "current-user", leaveType: "sick", totalAllocated: 12, used: 4, pending: 0, available: 8 },
-      { id: "bal-3", employeeId: "current-user", leaveType: "casual", totalAllocated: 6, used: 2, pending: 0, available: 4 },
-      { id: "bal-4", employeeId: "current-user", leaveType: "unpaid", totalAllocated: 0, used: 2, pending: 0, available: 0 },
+      { id: "bal-1", employeeId: "current-user", leaveType: "annual" as LeaveType, totalAllocated: 20, used: 6, pending: 0, available: 14 },
+      { id: "bal-2", employeeId: "current-user", leaveType: "sick" as LeaveType, totalAllocated: 12, used: 4, pending: 0, available: 8 },
+      { id: "bal-3", employeeId: "current-user", leaveType: "casual" as LeaveType, totalAllocated: 6, used: 2, pending: 0, available: 4 },
+      { id: "bal-4", employeeId: "current-user", leaveType: "unpaid" as LeaveType, totalAllocated: 0, used: 2, pending: 0, available: 0 },
     ];
-  }, []);
+  }, [serverBalances]);
 
-  // High-fidelity fallback leave requests database
-  const fallbackRequests: LeaveRequest[] = React.useMemo(() => {
-    return [
-      {
-        id: "req-1",
-        employeeId: "emp-1",
-        employee: {
-          id: "emp-1",
-          firstName: "John",
-          lastName: "Doe",
-          email: "john.doe@company.com",
-          designation: "Principal Engineer",
-          departmentId: "dept-1",
-        },
-        leaveType: "annual",
-        startDate: "2026-07-10",
-        endDate: "2026-07-14",
-        totalDays: 5,
-        reason: "Family trip to national park",
-        status: "pending",
-        createdAt: "2026-06-25T10:00:00.000Z",
-        updatedAt: "2026-06-25T10:00:00.000Z",
-      },
-      {
-        id: "req-2",
-        employeeId: "emp-3",
-        employee: {
-          id: "emp-3",
-          firstName: "Robert",
-          lastName: "Chen",
-          email: "robert.chen@company.com",
-          designation: "Talent Partner",
-          departmentId: "dept-4",
-        },
-        leaveType: "sick",
-        startDate: "2026-06-28",
-        endDate: "2026-06-29",
-        totalDays: 2,
-        reason: "Dental surgery post-op recovery",
-        status: "pending",
-        createdAt: "2026-06-26T14:30:00.000Z",
-        updatedAt: "2026-06-26T14:30:00.000Z",
-      },
-      {
-        id: "req-3",
-        employeeId: "emp-7",
-        employee: {
-          id: "emp-7",
-          firstName: "Alex",
-          lastName: "Rivera",
-          email: "alex.r@company.com",
-          designation: "DevOps Engineer",
-          departmentId: "dept-1",
-        },
-        leaveType: "casual",
-        startDate: "2026-06-26",
-        endDate: "2026-06-26",
-        totalDays: 1,
-        reason: "Household emergency repair",
-        status: "approved",
-        approvedBy: "Sarah Jenkins",
-        approvedByUser: { firstName: "Sarah", lastName: "Jenkins" },
-        createdAt: "2026-06-25T09:00:00.000Z",
-        updatedAt: "2026-06-25T17:00:00.000Z",
-      },
-      {
-        id: "req-4",
-        employeeId: "emp-4",
-        employee: {
-          id: "emp-4",
-          firstName: "Emily",
-          lastName: "Watson",
-          email: "emily.watson@company.com",
-          designation: "Marketing Specialist",
-          departmentId: "dept-3",
-        },
-        leaveType: "unpaid",
-        startDate: "2026-06-15",
-        endDate: "2026-06-18",
-        totalDays: 4,
-        reason: "Personal travel outside region",
-        status: "rejected",
-        approvedBy: "Marcus Aurelius",
-        approvedByUser: { firstName: "Marcus", lastName: "Aurelius" },
-        managerNotes: "Inadequate marketing team coverage during Q2 closing weeks.",
-        createdAt: "2026-06-10T11:00:00.000Z",
-        updatedAt: "2026-06-12T14:00:00.000Z",
-      },
-      {
-        id: "req-5",
-        employeeId: "emp-2",
-        employee: {
-          id: "emp-2",
-          firstName: "Jane",
-          lastName: "Smith",
-          email: "jane.smith@company.com",
-          designation: "Product Director",
-          departmentId: "dept-2",
-        },
-        leaveType: "annual",
-        startDate: "2026-06-27",
-        endDate: "2026-07-03",
-        totalDays: 5,
-        reason: "Moving house process",
-        status: "approved",
-        approvedBy: "Sarah Jenkins",
-        approvedByUser: { firstName: "Sarah", lastName: "Jenkins" },
-        createdAt: "2026-06-20T08:00:00.000Z",
-        updatedAt: "2026-06-22T10:00:00.000Z",
-      },
-    ];
-  }, []);
-
-  const [localRequests, setLocalRequests] = React.useState<LeaveRequest[]>([]);
-  const [localBalances, setLocalBalances] = React.useState<LeaveBalance[]>([]);
-
-  React.useEffect(() => {
-    setLocalRequests(fallbackRequests);
-    setLocalBalances(fallbackBalances);
-  }, [fallbackRequests, fallbackBalances]);
-
-  // Combined Data Lists
+  // Combined Data Lists — API data with client-side search filter
   const requestsList = React.useMemo(() => {
     const apiData = serverRequests?.data || [];
-    const sourceData = apiData.length > 0 ? apiData : localRequests;
+    if (!searchQuery) return apiData;
 
-    return sourceData.filter((req) => {
+    // Client-side text search (server doesn't support text search on populated fields)
+    return apiData.filter((req) => {
       const nameMatch = req.employee
         ? `${req.employee.firstName} ${req.employee.lastName}`
             .toLowerCase()
             .includes(searchQuery.toLowerCase())
         : false;
-      const reasonMatch = req.reason.toLowerCase().includes(searchQuery.toLowerCase());
-      const statusMatch = !statusFilter || req.status === statusFilter;
-      const typeMatch = !typeFilter || req.leaveType === typeFilter;
-
-      return (nameMatch || reasonMatch) && statusMatch && typeMatch;
+      const reasonMatch = (req.reason || "").toLowerCase().includes(searchQuery.toLowerCase());
+      return nameMatch || reasonMatch;
     });
-  }, [serverRequests, localRequests, searchQuery, statusFilter, typeFilter]);
+  }, [serverRequests, searchQuery]);
 
-  // Current logged in user requests (simulated filtering by current employee id)
-  const myRequests = React.useMemo(() => {
-    // Treat 'current-user' or the mocked user request as belonging to the active user
-    // Since we don't have auth structure fully connected, mock requests 3 & 5 are other employees, 1 & 2 are pending requests we manage
-    // Let's mock a couple of requests representing the logged-in user
-    return [
-      {
-        id: "my-1",
-        employeeId: "current-user",
-        leaveType: "annual" as LeaveType,
-        startDate: "2026-08-01",
-        endDate: "2026-08-08",
-        totalDays: 6,
-        reason: "Summer holiday",
-        status: "approved" as LeaveStatus,
-        approvedByUser: { firstName: "Sarah", lastName: "Jenkins" },
-        createdAt: "2026-06-15T09:00:00Z",
-        updatedAt: "2026-06-16T12:00:00Z",
-      },
-      {
-        id: "my-2",
-        employeeId: "current-user",
-        leaveType: "sick" as LeaveType,
-        startDate: "2026-05-12",
-        endDate: "2026-05-13",
-        totalDays: 2,
-        reason: "Severe viral fever",
-        status: "approved" as LeaveStatus,
-        approvedByUser: { firstName: "Sarah", lastName: "Jenkins" },
-        createdAt: "2026-05-12T08:00:00Z",
-        updatedAt: "2026-05-12T09:30:00Z",
-      },
-    ];
-  }, []);
-
-  const [localMyRequests, setLocalMyRequests] = React.useState<LeaveRequest[]>([]);
-  React.useEffect(() => {
-    setLocalMyRequests(myRequests);
-  }, [myRequests]);
+  // My requests — same API data, shown in the "My Leave Log" tab
+  // In a full auth setup, this would filter by the current user's employeeId
+  const myRequestsList = React.useMemo(() => {
+    return serverRequests?.data || [];
+  }, [serverRequests]);
 
   // Auto calculate total days in request dialog
   const calculatedDays = React.useMemo(() => {
@@ -381,36 +228,8 @@ export default function LeavePage() {
       setIsRequestOpen(false);
       refetch();
     } catch (err) {
-      const newRequest: LeaveRequest = {
-        id: `my-${Date.now()}`,
-        employeeId: "current-user",
-        leaveType: "annual",
-        startDate: payload.fromDate,
-        endDate: payload.toDate,
-        totalDays: calculatedDays,
-        reason: payload.reason || "",
-        contactNumber: payload.emergencyContact,
-        status: "pending",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      setLocalMyRequests([newRequest, ...localMyRequests]);
-
-      const updatedBalances = localBalances.map((bal) => {
-        if (bal.leaveType === "annual") {
-          return {
-            ...bal,
-            pending: bal.pending + calculatedDays,
-            available: Math.max(0, bal.available - calculatedDays),
-          };
-        }
-        return bal;
-      });
-      setLocalBalances(updatedBalances);
-
-      toast.info("Leave request queued locally (Mock mode)");
-      setIsRequestOpen(false);
+      console.error(err);
+      toast.error("Failed to submit leave request.");
     }
   };
 
@@ -421,14 +240,8 @@ export default function LeavePage() {
       toast.success("Leave request cancelled");
       refetch();
     } catch (err) {
-      const updated = localMyRequests.map((req) => {
-        if (req.id === id) {
-          return { ...req, status: "cancelled" as LeaveStatus };
-        }
-        return req;
-      });
-      setLocalMyRequests(updated);
-      toast.info("Cancelled leave request locally");
+      console.error(err);
+      toast.error("Failed to cancel leave request.");
     }
   };
 
@@ -462,23 +275,8 @@ export default function LeavePage() {
       setIsApprovalNoteOpen(false);
       refetch();
     } catch (err) {
-      // Mock local review update
-      const updated = localRequests.map((req) => {
-        if (req.id === selectedRequest.id) {
-          return {
-            ...req,
-            status: (approvalAction === "approve" ? "approved" : "rejected") as LeaveStatus,
-            managerNotes,
-            approvedByUser: { firstName: "Sarah", lastName: "Jenkins" },
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return req;
-      });
-
-      setLocalRequests(updated);
-      toast.info("Database mock update completed locally.");
-      setIsApprovalNoteOpen(false);
+      console.error(err);
+      toast.error(`Failed to ${approvalAction} leave request.`);
     }
   };
 
@@ -546,7 +344,168 @@ export default function LeavePage() {
   // Calendar dates details showing away employees (Today or upcoming)
   const calendarEvents = React.useMemo(() => {
     return requestsList.filter((req) => req.status === "approved");
-  }, [requestsList]);
+  }, [requestsList]);  const myLeaveColumns = React.useMemo<Column<LeaveRequest>[]>(() => [
+    {
+      header: "Leave Type",
+      cell: (req) => (
+        <span className="font-semibold text-slate-850">
+          {getLeaveTypeLabel(req.leaveType)}
+        </span>
+      ),
+      className: "px-6",
+    },
+    {
+      header: "Dates Range",
+      cell: (req) => (
+        <span className="text-xs text-slate-700 font-medium">
+          {new Date(req.startDate).toLocaleDateString()} - {new Date(req.endDate).toLocaleDateString()}
+        </span>
+      ),
+      className: "px-6",
+    },
+    {
+      header: "Days",
+      cell: (req) => (
+        <span className="font-bold text-slate-800">
+          {req.totalDays}
+        </span>
+      ),
+      className: "text-center px-6",
+    },
+    {
+      header: "Status",
+      cell: (req) => getStatusBadge(req.status),
+      className: "text-center px-6",
+    },
+    {
+      header: "Reason / Remarks",
+      cell: (req) => (
+        <div className="max-w-[200px] truncate text-xs text-slate-500">
+          <span className="font-semibold text-slate-700 block">Reason: {req.reason}</span>
+          {req.managerNotes && (
+            <span className="text-rose-600 font-medium block mt-0.5">Note: {req.managerNotes}</span>
+          )}
+        </div>
+      ),
+      className: "px-6",
+    },
+    {
+      header: "Actions",
+      cell: (req) => (
+        <div className="flex justify-center">
+          {req.status === "pending" ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleCancelRequest(req.id)}
+              className="text-xs text-rose-500 hover:text-rose-600 font-bold hover:bg-rose-50 rounded-md py-1 h-7"
+            >
+              Cancel
+            </Button>
+          ) : (
+            <span className="text-xs text-slate-400">-</span>
+          )}
+        </div>
+      ),
+      className: "text-center px-6",
+    },
+  ], [handleCancelRequest]);
+
+  const teamApprovalColumns = React.useMemo<Column<LeaveRequest>[]>(() => [
+    {
+      header: "Employee",
+      cell: (req) => {
+        const emp = req.employee;
+        const deptName = departments.find((d) => d.id === emp?.departmentId)?.name || "Corporate";
+        return (
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-700 text-xs shrink-0 border border-slate-200">
+              {emp ? `${emp.firstName[0]}${emp.lastName[0]}` : "EM"}
+            </div>
+            <div>
+              <p className="font-semibold text-slate-900 leading-tight">
+                {emp ? `${emp.firstName} ${emp.lastName}` : "Unknown"}
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                <Building className="h-3 w-3" />
+                {deptName}
+              </p>
+            </div>
+          </div>
+        );
+      },
+      className: "px-6",
+    },
+    {
+      header: "Leave Details",
+      cell: (req) => (
+        <div>
+          <span className="font-semibold text-slate-800 block text-xs">
+            {getLeaveTypeLabel(req.leaveType)}
+          </span>
+          <span className="text-[10px] text-slate-400 block mt-0.5">
+            {new Date(req.startDate).toLocaleDateString()} - {new Date(req.endDate).toLocaleDateString()}
+          </span>
+        </div>
+      ),
+      className: "px-6",
+    },
+    {
+      header: "Days",
+      cell: (req) => (
+        <span className="font-bold text-slate-800">
+          {req.totalDays}
+        </span>
+      ),
+      className: "text-center px-6",
+    },
+    {
+      header: "Status",
+      cell: (req) => getStatusBadge(req.status),
+      className: "text-center px-6",
+    },
+    {
+      header: "Reason Given",
+      cell: (req) => (
+        <span className="text-xs text-slate-500 max-w-[200px] truncate block">
+          {req.reason}
+        </span>
+      ),
+      className: "px-6",
+    },
+    {
+      header: "Action Review",
+      cell: (req) => (
+        <div className="flex justify-center">
+          {req.status === "pending" ? (
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenApprovalAction(req, "approve")}
+                className="text-xs px-2.5 h-7 font-semibold border-emerald-250 text-emerald-600 hover:bg-emerald-50/50"
+              >
+                Accept
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => handleOpenApprovalAction(req, "reject")}
+                className="text-xs px-2.5 h-7 font-semibold border-rose-250 text-rose-600 hover:bg-rose-50/50"
+              >
+                Deny
+              </Button>
+            </div>
+          ) : (
+            <span className="text-[11px] text-slate-400 font-medium">
+              Reviewed by {req.approvedByUser?.firstName || "Sarah"}
+            </span>
+          )}
+        </div>
+      ),
+      className: "text-center px-6",
+    },
+  ], [departments, handleOpenApprovalAction]);
 
   return (
     <div className="p-6 space-y-6 w-full">
@@ -585,7 +544,7 @@ export default function LeavePage() {
 
       {/* Leave Balances Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {localBalances.map((bal) => {
+        {balancesList.map((bal) => {
           let colorClass = "bg-indigo-50/50 text-indigo-700 border-indigo-100";
           let progressColor = "bg-indigo-600";
           if (bal.leaveType === "sick") {
@@ -647,264 +606,129 @@ export default function LeavePage() {
         })}
       </div>
 
+      {/* Tabbar */}
+      <div className="flex border-b border-slate-200 gap-2 mb-2">
+        <Button
+          variant="ghost"
+          onClick={() => setActiveTab("my-requests")}
+          className={cn(
+            "rounded-none border-b-2 pb-3 px-4 font-semibold text-sm transition-all -mb-[1px] flex items-center gap-2 h-auto hover:bg-transparent hover:text-indigo-600 bg-transparent text-slate-500 shadow-none border-t-0 border-x-0",
+            activeTab === "my-requests"
+              ? "border-indigo-600 text-indigo-600 font-bold"
+              : "border-transparent hover:border-slate-300"
+          )}
+        >
+          <User className="h-4 w-4 shrink-0" />
+          My Leave History
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => setActiveTab("team-approvals")}
+          className={cn(
+            "rounded-none border-b-2 pb-3 px-4 font-semibold text-sm transition-all -mb-[1px] flex items-center gap-2 h-auto hover:bg-transparent hover:text-indigo-600 bg-transparent text-slate-500 shadow-none border-t-0 border-x-0",
+            activeTab === "team-approvals"
+              ? "border-indigo-600 text-indigo-600 font-bold"
+              : "border-transparent hover:border-slate-300"
+          )}
+        >
+          <CheckCircle className="h-4 w-4 shrink-0" />
+          Team Approvals
+          {requestsList.filter(r => r.status === "pending").length > 0 && (
+            <Badge className="ml-1 bg-amber-500 text-white border-0 hover:bg-amber-600 font-bold text-[10px] scale-90">
+              {requestsList.filter(r => r.status === "pending").length}
+            </Badge>
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => setActiveTab("outages")}
+          className={cn(
+            "rounded-none border-b-2 pb-3 px-4 font-semibold text-sm transition-all -mb-[1px] flex items-center gap-2 h-auto hover:bg-transparent hover:text-indigo-600 bg-transparent text-slate-500 shadow-none border-t-0 border-x-0",
+            activeTab === "outages"
+              ? "border-indigo-600 text-indigo-600 font-bold"
+              : "border-transparent hover:border-slate-300"
+          )}
+        >
+          <Calendar className="h-4 w-4 shrink-0" />
+          Outages Calendar
+        </Button>
+      </div>
+
       {/* Main View Container */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        
-        {/* Left Tabs Sidebar */}
-        <div className="space-y-2">
-          <Button
-            variant={activeTab === "my-requests" ? "secondary" : "ghost"}
-            onClick={() => setActiveTab("my-requests")}
-            className={cn(
-              "w-full justify-start font-semibold text-slate-700",
-              activeTab === "my-requests" && "bg-indigo-50 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-700"
-            )}
-          >
-            <User className="mr-2 h-4 w-4 shrink-0" />
-            My Leave History
-          </Button>
-          <Button
-            variant={activeTab === "team-approvals" ? "secondary" : "ghost"}
-            onClick={() => setActiveTab("team-approvals")}
-            className={cn(
-              "w-full justify-start font-semibold text-slate-700",
-              activeTab === "team-approvals" && "bg-indigo-50 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-700"
-            )}
-          >
-            <CheckCircle className="mr-2 h-4 w-4 shrink-0" />
-            Team Approvals
-            {requestsList.filter(r => r.status === "pending").length > 0 && (
-              <Badge className="ml-auto bg-amber-500 text-white border-0 hover:bg-amber-600 font-bold text-[10px]">
-                {requestsList.filter(r => r.status === "pending").length}
-              </Badge>
-            )}
-          </Button>
-          <Button
-            variant={activeTab === "outages" ? "secondary" : "ghost"}
-            onClick={() => setActiveTab("outages")}
-            className={cn(
-              "w-full justify-start font-semibold text-slate-700",
-              activeTab === "outages" && "bg-indigo-50 text-indigo-700 hover:bg-indigo-50 hover:text-indigo-700"
-            )}
-          >
-            <Calendar className="mr-2 h-4 w-4 shrink-0" />
-            Outages Calendar
-          </Button>
-        </div>
+      <div className="w-full">
+        {/* Tab 1: My Requests */}
+        {activeTab === "my-requests" && (
+          <Card className="border-slate-200 bg-white shadow-xs">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-bold text-slate-800">My Leave Log</CardTitle>
+              <CardDescription className="text-xs">
+                Your submitted requests, approvals, and cancellation triggers.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              <DataTable
+                data={myRequestsList}
+                columns={myLeaveColumns}
+                isLoading={isLoading}
+                emptyMessage="No leave requests found. Click 'Request Leave' above to create one."
+              />
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Right Content Database */}
-        <div className="lg:col-span-3">
-          
-          {/* Tab 1: My Requests */}
-          {activeTab === "my-requests" && (
-            <Card className="border-slate-200 bg-white shadow-xs">
-              <CardHeader className="pb-3">
-                <CardTitle className="text-sm font-bold text-slate-800">My Leave Log</CardTitle>
-                <CardDescription className="text-xs">
-                  Your submitted requests, approvals, and cancellation triggers.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-y border-slate-100 bg-slate-50/55 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                        <th className="py-3 px-6">Leave Type</th>
-                        <th className="py-3 px-6">Dates Range</th>
-                        <th className="py-3 px-6 text-center">Days</th>
-                        <th className="py-3 px-6 text-center">Status</th>
-                        <th className="py-3 px-6">Reason / Remarks</th>
-                        <th className="py-3 px-6 text-center">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-                      {localMyRequests.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-12 text-center text-slate-400">
-                            <FileText className="h-6 w-6 mx-auto text-slate-300 mb-2" />
-                            <span className="text-xs font-semibold">No leave requests found. Click "Request Leave" above to create one.</span>
-                          </td>
-                        </tr>
-                      ) : (
-                        localMyRequests.map((req) => (
-                          <tr key={req.id} className="hover:bg-slate-50/30 transition-colors">
-                            <td className="py-3.5 px-6 font-semibold text-slate-850">
-                              {getLeaveTypeLabel(req.leaveType)}
-                            </td>
-                            <td className="py-3.5 px-6 text-xs text-slate-700 font-medium">
-                              {new Date(req.startDate).toLocaleDateString()} - {new Date(req.endDate).toLocaleDateString()}
-                            </td>
-                            <td className="py-3.5 px-6 text-center font-bold text-slate-800">
-                              {req.totalDays}
-                            </td>
-                            <td className="py-3.5 px-6 text-center">
-                              {getStatusBadge(req.status)}
-                            </td>
-                            <td className="py-3.5 px-6 text-xs text-slate-500 max-w-[200px] truncate">
-                              <span className="font-semibold text-slate-700 block">Reason: {req.reason}</span>
-                              {req.managerNotes && (
-                                <span className="text-rose-600 font-medium block mt-0.5">Note: {req.managerNotes}</span>
-                              )}
-                            </td>
-                            <td className="py-3.5 px-6 text-center">
-                              {req.status === "pending" && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleCancelRequest(req.id)}
-                                  className="text-xs text-rose-500 hover:text-rose-600 font-bold hover:bg-rose-50 rounded-md py-1 h-7"
-                                >
-                                  Cancel
-                                </Button>
-                              )}
-                              {req.status !== "pending" && (
-                                <span className="text-xs text-slate-400">-</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+        {/* Tab 2: Team Approvals */}
+        {activeTab === "team-approvals" && (
+          <Card className="border-slate-200 bg-white shadow-xs">
+            <CardHeader className="pb-3 border-b border-slate-100">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-sm font-bold text-slate-800">Team Requests Review</CardTitle>
+                  <CardDescription className="text-xs">
+                    Approve or deny pending leave requests submitted by staff members.
+                  </CardDescription>
                 </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Tab 2: Team Approvals */}
-          {activeTab === "team-approvals" && (
-            <Card className="border-slate-200 bg-white shadow-xs">
-              <CardHeader className="pb-3 border-b border-slate-100">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-sm font-bold text-slate-800">Team Requests Review</CardTitle>
-                    <CardDescription className="text-xs">
-                      Approve or deny pending leave requests submitted by staff members.
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Search employee..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="h-8 max-w-[200px] text-xs"
-                    />
-                    <select
-                      value={statusFilter}
-                      onChange={(e) => setStatusFilter(e.target.value)}
-                      className="h-8 px-2 text-xs bg-white rounded-lg border border-slate-200 focus:outline-hidden"
-                    >
-                      <option value="">All Statuses</option>
-                      <option value="pending">Pending Only</option>
-                      <option value="approved">Approved</option>
-                      <option value="rejected">Rejected</option>
-                    </select>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Search employee..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="h-8 max-w-[200px] text-xs"
+                  />
+                  <select
+                    value={typeFilter}
+                    onChange={(e) => setTypeFilter(e.target.value)}
+                    className="h-8 px-2 text-xs bg-white rounded-lg border border-slate-200 focus:outline-hidden"
+                  >
+                    <option value="">All Leave Types</option>
+                    {leaveTypes?.map((lt) => (
+                      <option key={lt._id} value={lt._id}>
+                        {lt.name}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="h-8 px-2 text-xs bg-white rounded-lg border border-slate-200 focus:outline-hidden"
+                  >
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending Only</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
                 </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/55 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                        <th className="py-3 px-6">Employee</th>
-                        <th className="py-3 px-6">Leave Details</th>
-                        <th className="py-3 px-6 text-center">Days</th>
-                        <th className="py-3 px-6 text-center">Status</th>
-                        <th className="py-3 px-6">Reason Given</th>
-                        <th className="py-3 px-6 text-center">Action Review</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-                      {isLoading ? (
-                        <tr>
-                          <td colSpan={6} className="py-12 text-center text-slate-400">
-                            <span>Loading requests queue...</span>
-                          </td>
-                        </tr>
-                      ) : requestsList.length === 0 ? (
-                        <tr>
-                          <td colSpan={6} className="py-12 text-center text-slate-400">
-                            <AlertCircle className="h-6 w-6 mx-auto text-slate-300 mb-2" />
-                            <span className="text-xs font-semibold">No requests match criteria</span>
-                          </td>
-                        </tr>
-                      ) : (
-                        requestsList.map((req) => {
-                          const emp = req.employee;
-                          const deptName = departments.find((d) => d.id === emp?.departmentId)?.name || "Corporate";
-
-                          return (
-                            <tr key={req.id} className="hover:bg-slate-50/30 transition-colors">
-                              <td className="py-3.5 px-6">
-                                <div className="flex items-center gap-3">
-                                  <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-700 text-xs shrink-0 border border-slate-200">
-                                    {emp ? `${emp.firstName[0]}${emp.lastName[0]}` : "EM"}
-                                  </div>
-                                  <div>
-                                    <p className="font-semibold text-slate-900 leading-tight">
-                                      {emp ? `${emp.firstName} ${emp.lastName}` : "Unknown"}
-                                    </p>
-                                    <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                                      <Building className="h-3 w-3" />
-                                      {deptName}
-                                    </p>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="py-3.5 px-6">
-                                <span className="font-semibold text-slate-800 block text-xs">
-                                  {getLeaveTypeLabel(req.leaveType)}
-                                </span>
-                                <span className="text-[10px] text-slate-400 block mt-0.5">
-                                  {new Date(req.startDate).toLocaleDateString()} - {new Date(req.endDate).toLocaleDateString()}
-                                </span>
-                              </td>
-                              <td className="py-3.5 px-6 text-center font-bold text-slate-800">
-                                {req.totalDays}
-                              </td>
-                              <td className="py-3.5 px-6 text-center">
-                                {getStatusBadge(req.status)}
-                              </td>
-                              <td className="py-3.5 px-6 text-xs text-slate-500 max-w-[200px] truncate">
-                                {req.reason}
-                              </td>
-                              <td className="py-3.5 px-6 text-center">
-                                {req.status === "pending" ? (
-                                  <div className="flex justify-center items-center gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleOpenApprovalAction(req, "approve")}
-                                      className="text-xs px-2.5 h-7 font-semibold border-emerald-250 text-emerald-600 hover:bg-emerald-50/50"
-                                    >
-                                      Accept
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleOpenApprovalAction(req, "reject")}
-                                      className="text-xs px-2.5 h-7 font-semibold border-rose-250 text-rose-600 hover:bg-rose-50/50"
-                                    >
-                                      Deny
-                                    </Button>
-                                  </div>
-                                ) : (
-                                  <span className="text-[11px] text-slate-400 font-medium">
-                                    Reviewed by {req.approvedByUser?.firstName || "Sarah"}
-                                  </span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <DataTable
+                data={requestsList}
+                columns={teamApprovalColumns}
+                isLoading={isLoading}
+                emptyMessage="No requests match criteria"
+              />
+            </CardContent>
+          </Card>
+        )}
 
           {/* Tab 3: Leave Outages */}
           {activeTab === "outages" && (
@@ -971,8 +795,6 @@ export default function LeavePage() {
               </CardContent>
             </Card>
           )}
-
-        </div>
       </div>
 
       {/* Leave Request Dialog Form */}

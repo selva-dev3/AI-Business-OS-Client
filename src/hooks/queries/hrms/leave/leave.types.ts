@@ -59,8 +59,12 @@ export type LeaveListResponse = {
 export type LeaveSearchParams = ListParams & {
   status?: string;
   leaveType?: string;
+  leaveTypeId?: string;
   departmentId?: string;
   employeeId?: string;
+  fromDate?: string;
+  toDate?: string;
+  search?: string;
 };
 
 export type LeaveTypeOption = {
