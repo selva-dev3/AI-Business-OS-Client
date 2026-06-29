@@ -123,7 +123,7 @@ export function useResetPassword() {
 export function useCreateDocument() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: CreateDocumentData }) => employeesApi.createDocument(id, data),
+    mutationFn: ({ id, data }: { id: string; data: CreateDocumentData | FormData }) => employeesApi.createDocument(id, data),
     onSuccess: (_, { id }) => {
       toast.success("Document uploaded successfully");
       qc.invalidateQueries({ queryKey: ["documents", id] });

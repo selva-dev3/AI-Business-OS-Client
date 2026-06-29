@@ -83,7 +83,10 @@ export const employeesApi = {
   getDocuments: (id: string, params?: { type?: string; page?: number; limit?: number }) =>
     apiGet<{ data: EmployeeDocumentItem[]; meta: any }>(`${BASE}/${id}/documents${buildQueryString(params ?? {})}`),
 
-  createDocument: (id: string, data: CreateDocumentData) => apiPost<EmployeeDocumentItem>(`${BASE}/${id}/documents`, data),
+  createDocument: (id: string, data: CreateDocumentData | FormData) =>
+    apiPost<EmployeeDocumentItem>(`${BASE}/${id}/documents`, data, {
+      headers: data instanceof FormData ? { "Content-Type": "multipart/form-data" } : undefined,
+    }),
 
   getNotes: (id: string, params?: { category?: string; page?: number; limit?: number }) =>
     apiGet<{ data: EmployeeNoteItem[]; meta: any }>(`${BASE}/${id}/notes${buildQueryString(params ?? {})}`),

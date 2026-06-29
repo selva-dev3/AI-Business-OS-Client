@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useDocuments } from "@/hooks/useEmployeeTabData";
 import { useCreateDocument } from "@/hooks/useEmployeeMutations";
+import { auth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -68,9 +69,21 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
   const [fileUrl, setFileUrl] = React.useState("");
   const [expiryDate, setExpiryDate] = React.useState("");
   const [isConfidential, setIsConfidential] = React.useState(false);
+  
+  // File upload state and ref
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [selectedFile, setSelectedFile] = React.useState<File | null>(null);
+  const [useUrl, setUseUrl] = React.useState(false);
 
   const resetForm = () => {
-    setDocType(""); setDocName(""); setFileUrl(""); setExpiryDate(""); setIsConfidential(false);
+    setDocType("");
+    setDocName("");
+    setFileUrl("");
+    setExpiryDate("");
+    setIsConfidential(false);
+    setSelectedFile(null);
+    setUseUrl(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleUpload = async () => {
@@ -78,22 +91,54 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
       toast.error("Document type and name are required");
       return;
     }
+    if (!useUrl && !selectedFile) {
+      toast.error("Please select a file to upload");
+      return;
+    }
+    if (useUrl && !fileUrl) {
+      toast.error("Please enter a valid file URL");
+      return;
+    }
+
     try {
-      await createMutation.mutateAsync({
-        id: employeeId,
-        data: {
-          documentType: docType,
-          documentName: docName,
-          fileUrl: fileUrl || undefined,
-          expiryDate: expiryDate || undefined,
-          isConfidential,
-        },
-      });
+      if (selectedFile) {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        formData.append("documentType", docType);
+        formData.append("documentName", docName);
+        if (expiryDate) formData.append("expiryDate", expiryDate);
+        formData.append("isConfidential", String(isConfidential));
+
+        await createMutation.mutateAsync({
+          id: employeeId,
+          data: formData,
+        });
+      } else {
+        await createMutation.mutateAsync({
+          id: employeeId,
+          data: {
+            documentType: docType,
+            documentName: docName,
+            fileUrl: fileUrl || undefined,
+            expiryDate: expiryDate || undefined,
+            isConfidential,
+          },
+        });
+      }
       setUploadOpen(false);
       resetForm();
     } catch {
       // error handled by mutation
     }
+  };
+
+  const getFileUrl = (doc: EmployeeDocumentItem) => {
+    const url = doc.fileUrl;
+    if (!url) return "#";
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+    const token = auth.getAccessToken();
+    return `${baseUrl}/hrms/employees/${employeeId}/documents/${doc.id || (doc as any)._id}/download?token=${token || ""}`;
   };
 
   if (isLoading) {
@@ -133,7 +178,7 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
           </SelectContent>
         </Select>
 
-        <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+        <Dialog open={uploadOpen} onOpenChange={(open) => { setUploadOpen(open); if (!open) resetForm(); }}>
           <DialogTrigger asChild>
             <Button size="sm" className="gap-2">
               <Upload className="h-4 w-4" /> Upload
@@ -161,10 +206,93 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
                 <Label>Document Name</Label>
                 <Input value={docName} onChange={(e) => setDocName(e.target.value)} placeholder="e.g. Signed Offer Letter" />
               </div>
-              <div className="space-y-2">
-                <Label>File URL</Label>
-                <Input value={fileUrl} onChange={(e) => setFileUrl(e.target.value)} placeholder="https://..." />
-              </div>
+
+              {!useUrl ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>File Upload</Label>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 text-xs text-indigo-600"
+                      onClick={() => setUseUrl(true)}
+                    >
+                      Use File URL instead
+                    </Button>
+                  </div>
+                  <div
+                    className={cn(
+                      "border-2 border-dashed rounded-lg p-5 text-center cursor-pointer transition-colors duration-200",
+                      selectedFile
+                        ? "border-emerald-500 bg-emerald-50/30"
+                        : "border-slate-200 hover:border-indigo-400 bg-slate-50/50"
+                    )}
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setSelectedFile(file);
+                          if (!docName) {
+                            const baseName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                            setDocName(baseName);
+                          }
+                        }
+                      }}
+                    />
+                    {selectedFile ? (
+                      <div className="space-y-1">
+                        <FileText className="h-8 w-8 text-emerald-500 mx-auto mb-1" />
+                        <p className="text-xs font-semibold text-emerald-700 truncate max-w-[280px] mx-auto">
+                          {selectedFile.name}
+                        </p>
+                        <p className="text-[10px] text-emerald-600">
+                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedFile(null);
+                            if (fileInputRef.current) fileInputRef.current.value = "";
+                          }}
+                          className="text-[10px] text-rose-500 font-medium hover:underline mt-2 block mx-auto"
+                        >
+                          Remove file
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <Upload className="h-7 w-7 text-slate-400 mx-auto mb-1" />
+                        <p className="text-xs text-slate-600">
+                          <span className="font-semibold text-indigo-600 hover:underline">Click to upload</span> or drag and drop
+                        </p>
+                        <p className="text-[9px] text-slate-400">PDF, PNG, JPG, DOC or DOCX (max 50MB)</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>File URL</Label>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 text-xs text-indigo-600"
+                      onClick={() => setUseUrl(false)}
+                    >
+                      Upload local file instead
+                    </Button>
+                  </div>
+                  <Input value={fileUrl} onChange={(e) => setFileUrl(e.target.value)} placeholder="https://..." />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Expiry Date (optional)</Label>
                 <Input type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
@@ -233,7 +361,7 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
                   </TableCell>
                   <TableCell>
                     <a
-                      href={doc.fileUrl}
+                      href={getFileUrl(doc)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800"
