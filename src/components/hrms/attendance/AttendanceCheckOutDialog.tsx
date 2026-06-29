@@ -9,14 +9,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { AttendanceCheckInForm } from "./AttendanceCheckInForm";
-import { useCreateAttendance } from "@/hooks/queries/hrms/attendance/attendance.hooks";
-import { CheckInFormData } from "@/hooks/queries/hrms/attendance/attendance.types";
+import { AttendanceCheckOutForm } from "./AttendanceCheckOutForm";
+import { useCheckOut } from "@/hooks/queries/hrms/attendance/attendance.hooks";
+import { CheckOutFormData } from "@/hooks/queries/hrms/attendance/attendance.types";
 
-interface AttendanceCheckInDialogProps {
+interface AttendanceCheckOutDialogProps {
   employee: {
     id: string;
-    _id?: string;
     firstName: string;
     lastName: string;
     employeeCode?: string;
@@ -24,7 +23,7 @@ interface AttendanceCheckInDialogProps {
   } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: (checkInTime?: string) => void;
+  onSuccess?: () => void;
 }
 
 function toLocalTimeString(date: Date): string {
@@ -37,24 +36,21 @@ function toLocalDateString(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
-export function AttendanceCheckInDialog({
+export function AttendanceCheckOutDialog({
   employee,
   open,
   onOpenChange,
   onSuccess,
-}: AttendanceCheckInDialogProps) {
-  const createAttendance = useCreateAttendance();
+}: AttendanceCheckOutDialogProps) {
+  const checkOutMutation = useCheckOut();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  const defaultValues = React.useMemo<CheckInFormData>(() => {
+  const defaultValues = React.useMemo<CheckOutFormData>(() => {
     const d = new Date();
     return {
-      employeeId: employee?.id || employee?._id || "",
-      attendanceDate: toLocalDateString(d),
-      checkIn: toLocalTimeString(d),
-      attendanceType: "PRESENT",
-      shift: "",
-      workLocation: "",
+      employeeId: employee?.id || "",
+      date: toLocalDateString(d),
+      checkOut: toLocalTimeString(d),
       remarks: "",
     };
   }, [employee]);
@@ -64,35 +60,26 @@ export function AttendanceCheckInDialog({
     : "";
   const employeeCode = employee?.employeeCode || employee?.employeeId || "";
 
-  const handleSubmit = async (data: CheckInFormData) => {
+  const handleSubmit = async (data: CheckOutFormData) => {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
     try {
-      const checkInISO = new Date(`${data.attendanceDate}T${data.checkIn}:00`).toISOString();
-      const dateISO = new Date(data.attendanceDate).toISOString();
+      const checkOutISO = new Date(`${data.date}T${data.checkOut}:00`).toISOString();
 
-      const remarksParts: string[] = [];
-      if (data.shift) remarksParts.push(`Shift: ${data.shift}`);
-      if (data.workLocation) remarksParts.push(`Location: ${data.workLocation}`);
-      if (data.remarks) remarksParts.push(data.remarks);
-      const combinedNotes = remarksParts.join(" | ");
-
-      await createAttendance.mutateAsync({
+      await checkOutMutation.mutateAsync({
         employeeId: data.employeeId,
-        date: dateISO,
-        status: data.attendanceType,
-        checkIn: checkInISO,
-        checkOut: null,
-        notes: combinedNotes || null,
+        date: new Date(data.date).toISOString(),
+        checkOut: checkOutISO,
+        notes: data.remarks || undefined,
       });
 
-      toast.success(`${employeeName} checked in successfully`);
+      toast.success(`${employeeName} checked out successfully`);
       onOpenChange(false);
-      onSuccess?.(checkInISO);
+      onSuccess?.();
     } catch (err: unknown) {
       const error = err as { response?: { data?: { message?: string } }; message?: string };
-      const message = error?.response?.data?.message || error?.message || "Failed to check in";
+      const message = error?.response?.data?.message || error?.message || "Failed to check out";
       toast.error(message);
     } finally {
       setIsSubmitting(false);
@@ -114,15 +101,16 @@ export function AttendanceCheckInDialog({
       <DialogContent className="sm:max-w-md max-w-full bg-white border border-slate-200 rounded-xl p-6">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold text-slate-900">
-            Attendance Check-In
+            Attendance Check-Out
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-400">
-            Record check-in for {employeeName || "employee"}.
+            Record check-out for {employeeName || "employee"}.
           </DialogDescription>
         </DialogHeader>
 
-        <AttendanceCheckInForm
+        <AttendanceCheckOutForm
           defaultValues={defaultValues}
+          employeeName={employeeName}
           employeeCode={employeeCode}
           isSubmitting={isSubmitting}
           onSubmit={handleSubmit}

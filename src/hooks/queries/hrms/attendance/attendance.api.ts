@@ -1,12 +1,19 @@
-import { apiGet, apiPost, apiPatch } from "@/hooks/queries/client";
+import { apiGet, apiPost, apiPatch, apiClient } from "@/hooks/queries/client";
 import { buildQueryString } from "@/hooks/queries/utils";
 import {
   AttendanceRecord,
   AttendanceListResponse,
   AttendanceSummary,
   AttendanceSearchParams,
+  AttendanceReportItem,
+  AttendanceReportParams,
+  BulkAttendanceRequest,
+  BulkAttendanceResult,
   CheckInRequest,
   CheckOutRequest,
+  CreateRegularizationPayload,
+  RegularizationRecord,
+  ApproveRejectRegularizationPayload,
   UpdateAttendanceRequest,
 } from "./attendance.types";
 
@@ -40,4 +47,23 @@ export const attendanceApi = {
 
   getById: (id: string) =>
     apiGet<AttendanceRecord>(`${BASE}/${id}`),
+
+  // ─── BULK ────────────────────────────────────────────────────────────────
+  bulkCreate: (data: BulkAttendanceRequest) =>
+    apiPost<BulkAttendanceResult>(`${BASE}/bulk`, data),
+
+  // ─── REGULARIZATION ──────────────────────────────────────────────────────
+  createRegularization: (data: CreateRegularizationPayload) =>
+    apiPost<RegularizationRecord>(`${BASE}/regularize`, data),
+
+  approveRejectRegularization: (id: string, data: ApproveRejectRegularizationPayload) =>
+    apiPatch<RegularizationRecord>(`${BASE}/regularize/${id}`, data),
+
+  // ─── REPORTS ─────────────────────────────────────────────────────────────
+  getAttendanceReport: (params?: AttendanceReportParams) =>
+    apiGet<AttendanceReportItem[]>(`/hrms/reports/attendance${buildQueryString(params ?? {})}`),
+
+  // ─── EXPORT ──────────────────────────────────────────────────────────────
+  exportAttendance: (params?: { fromDate?: string; toDate?: string; employeeId?: string }) =>
+    apiClient.get<Blob>(`${BASE}/export${buildQueryString(params ?? {})}`, { responseType: "blob" }),
 } as const;

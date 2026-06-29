@@ -43,7 +43,6 @@ import {
 // Import hooks and types
 import {
   useAttendanceList,
-  useAttendanceSummary,
   useCheckOut,
   useUpdateAttendance,
   useCreateAttendance,
@@ -54,6 +53,10 @@ import { useDepartments } from "@/hooks/queries/hrms/departments/departments.hoo
 import { DataTable, Column } from "@/components/shared/datatable";
 import { AttendanceCheckInButton } from "@/components/hrms/attendance/AttendanceCheckInButton";
 import { AttendanceCheckInDialog } from "@/components/hrms/attendance/AttendanceCheckInDialog";
+import { AttendanceCheckOutDialog } from "@/components/hrms/attendance/AttendanceCheckOutDialog";
+import { AttendanceRegularizeDialog } from "@/components/hrms/attendance/AttendanceRegularizeDialog";
+import { AttendanceBulkDialog } from "@/components/hrms/attendance/AttendanceBulkDialog";
+import { AttendanceExportButton } from "@/components/hrms/attendance/AttendanceExportButton";
 
 // Normalize database attendance record structure to frontend representation
 const normalizeAttendance = (record: any): AttendanceRecord => {
@@ -97,6 +100,16 @@ export default function AttendancePage() {
     new Date().toISOString().split("T")[0]
   );
 
+  const [page, setPage] = React.useState(1);
+  const [limit] = React.useState(15);
+
+  const [prevFilterKey, setPrevFilterKey] = React.useState("");
+  const filterKey = `${searchQuery}|${statusFilter}|${deptFilter}|${dateFilter}`;
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
   // Modals state
   const [isEditOpen, setIsEditOpen] = React.useState(false);
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
@@ -108,6 +121,21 @@ export default function AttendancePage() {
     lastName: string;
     employeeCode?: string;
   } | null>(null);
+  const [isCheckOutOpen, setIsCheckOutOpen] = React.useState(false);
+  const [checkOutEmployee, setCheckOutEmployee] = React.useState<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeCode?: string;
+  } | null>(null);
+  const [isRegularizeOpen, setIsRegularizeOpen] = React.useState(false);
+  const [regularizeEmployee, setRegularizeEmployee] = React.useState<{
+    id: string;
+    firstName: string;
+    lastName: string;
+    employeeCode?: string;
+  } | null>(null);
+  const [isBulkOpen, setIsBulkOpen] = React.useState(false);
 
   // Form override values
   const [formValues, setFormValues] = React.useState({
@@ -190,6 +218,8 @@ export default function AttendancePage() {
     status: statusFilter || undefined,
     departmentId: deptFilter || undefined,
     search: searchQuery || undefined,
+    page,
+    limit,
   });
 
   const checkOutMutation = useCheckOut();
@@ -400,7 +430,7 @@ export default function AttendancePage() {
     const halfDay = attendanceList.filter((r) => r.status === "half_day").length;
     const onLeave = attendanceList.filter((r) => r.status === "on_leave").length;
 
-    const presentRate = total > 0 ? ((present + late + halfDay) / (total - onLeave)) * 100 : 0;
+    const presentRate = total > 0 ? ((present + late + halfDay) / Math.max(total - onLeave, 1)) * 100 : 0;
     
     // Average hours calculated for present, late, or half day workers
     const activeWorkers = attendanceList.filter((r) => r.totalHours && r.totalHours > 0);
@@ -460,6 +490,32 @@ export default function AttendancePage() {
     });
     refetch();
   }, [refetch]);
+
+  const handleOpenCheckOut = React.useCallback((record: AttendanceRecord) => {
+    const emp = record.employee;
+    if (emp) {
+      setCheckOutEmployee({
+        id: emp.id,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        employeeCode: (emp as Record<string, unknown>).employeeCode as string | undefined,
+      });
+    }
+    setIsCheckOutOpen(true);
+  }, []);
+
+  const handleOpenRegularize = React.useCallback((record: AttendanceRecord) => {
+    const emp = record.employee;
+    if (emp) {
+      setRegularizeEmployee({
+        id: emp.id,
+        firstName: emp.firstName,
+        lastName: emp.lastName,
+        employeeCode: (emp as Record<string, unknown>).employeeCode as string | undefined,
+      });
+    }
+    setIsRegularizeOpen(true);
+  }, []);
 
   // Handle user check-out button click
   const handleCheckOut = async () => {
@@ -738,6 +794,7 @@ export default function AttendancePage() {
       header: "Actions",
       cell: (record) => {
         const noCheckIn = !record.checkIn && record.status !== "on_leave";
+        const checkedInNoCheckOut = !!record.checkIn && !record.checkOut && record.status !== "on_leave";
         return (
           <div className="flex items-center justify-center gap-1">
             {noCheckIn && (
@@ -746,6 +803,34 @@ export default function AttendancePage() {
                 variant="ghost"
                 className="h-8 px-2 text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 text-[11px] font-semibold"
               />
+            )}
+            {checkedInNoCheckOut && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenCheckOut(record);
+                }}
+                className="h-8 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-[11px] font-semibold"
+              >
+                <Square className="h-3 w-3 mr-1" />
+                Check Out
+              </Button>
+            )}
+            {record.checkIn && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleOpenRegularize(record);
+                }}
+                className="h-8 px-2 text-amber-600 hover:text-amber-700 hover:bg-amber-50 text-[11px] font-semibold"
+              >
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Regularize
+              </Button>
             )}
             <Button
               variant="ghost"
@@ -763,7 +848,7 @@ export default function AttendancePage() {
       },
       className: "py-3.5 px-6 text-center",
     },
-  ], [departments, handleOpenEdit, handleOpenEmployeeCheckIn]);
+  ], [departments, handleOpenEdit, handleOpenEmployeeCheckIn, handleOpenCheckOut, handleOpenRegularize]);
 
   return (
     <div className="p-6 space-y-6 w-full">
@@ -779,6 +864,15 @@ export default function AttendancePage() {
         </div>
         <div className="flex items-center gap-2">
           <Button
+            onClick={() => setIsBulkOpen(true)}
+            size="sm"
+            variant="outline"
+            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50 font-semibold flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Bulk Entry
+          </Button>
+          <Button
             onClick={() => setIsCreateOpen(true)}
             size="sm"
             className="bg-indigo-600 text-white hover:bg-indigo-700 font-semibold shadow-xs flex items-center gap-2"
@@ -786,17 +880,13 @@ export default function AttendancePage() {
             <Plus className="h-4 w-4" />
             Create Attendance
           </Button>
-          <Button
+          <AttendanceExportButton
+            fromDate={dateFilter}
+            toDate={dateFilter}
             variant="outline"
             size="sm"
-            onClick={() => {
-              toast.success("Downloading attendance log CSV...");
-            }}
-            className="flex items-center gap-2 text-slate-600 dark:text-slate-300"
-          >
-            <Download className="h-4 w-4" />
-            Export Log
-          </Button>
+            className="text-slate-600 dark:text-slate-300"
+          />
         </div>
       </div>
 
@@ -1036,6 +1126,31 @@ export default function AttendancePage() {
             emptyMessage="No logs match the current query criteria"
             onRowClick={(row) => router.push(`/hrms/attendance/${row.id}`)}
           />
+          {serverAttendance?.meta && serverAttendance.meta.totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-3 border-t border-slate-100">
+              <p className="text-xs text-slate-500">
+                Page {page} of {serverAttendance.meta.totalPages} ({serverAttendance.meta.total} records)
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= (serverAttendance?.meta?.totalPages || 1)}
+                  onClick={() => setPage((p) => p + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1044,6 +1159,29 @@ export default function AttendancePage() {
         employee={checkInEmployee}
         open={isCheckInOpen}
         onOpenChange={setIsCheckInOpen}
+        onSuccess={handleCheckInSuccess}
+      />
+
+      {/* Attendance Check-Out Dialog */}
+      <AttendanceCheckOutDialog
+        employee={checkOutEmployee}
+        open={isCheckOutOpen}
+        onOpenChange={setIsCheckOutOpen}
+        onSuccess={handleCheckInSuccess}
+      />
+
+      {/* Attendance Regularization Dialog */}
+      <AttendanceRegularizeDialog
+        employee={regularizeEmployee}
+        open={isRegularizeOpen}
+        onOpenChange={setIsRegularizeOpen}
+        onSuccess={handleCheckInSuccess}
+      />
+
+      {/* Bulk Attendance Dialog */}
+      <AttendanceBulkDialog
+        open={isBulkOpen}
+        onOpenChange={setIsBulkOpen}
         onSuccess={handleCheckInSuccess}
       />
 

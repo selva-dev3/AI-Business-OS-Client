@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { CheckInFormData } from "@/hooks/queries/hrms/attendance/attendance.types";
 import { useEmployees } from "@/hooks/queries/hrms/employees/employees.hooks";
+import type { Employee } from "@/hooks/queries/hrms/employees/employees.types";
 
 const checkInSchema = z.object({
   employeeId: z.string().min(1, "Employee is required"),
@@ -44,20 +45,19 @@ interface AttendanceCheckInFormProps {
 
 export function AttendanceCheckInForm({
   defaultValues,
-  employeeName,
   employeeCode,
   isSubmitting,
   onSubmit,
   onCancel,
-}: AttendanceCheckInFormProps) {
+}: Omit<AttendanceCheckInFormProps, "employeeName">) {
   const form = useForm<CheckInFormValues>({
     resolver: zodResolver(checkInSchema),
     defaultValues,
   });
 
   const { data: employeesData } = useEmployees();
-  const employeesList = React.useMemo(() => {
-    return employeesData?.employees || employeesData?.data || [];
+  const employeesList: Employee[] = React.useMemo(() => {
+    return (employeesData?.employees || employeesData?.data || []) as Employee[];
   }, [employeesData]);
 
   React.useEffect(() => {
@@ -76,7 +76,7 @@ export function AttendanceCheckInForm({
           name="employeeId"
           render={({ field }) => {
             const selectedEmp = employeesList.find(
-              (emp: any) => (emp.id || emp._id) === field.value
+              (emp) => emp.id === field.value
             );
             const currentCode = selectedEmp?.employeeId || selectedEmp?.employeeCode || employeeCode || "—";
             return (
@@ -94,8 +94,8 @@ export function AttendanceCheckInForm({
                       className="w-full h-8 px-2 text-xs bg-white rounded-md border border-slate-200 focus:outline-hidden focus:ring-1 focus:ring-indigo-500 text-slate-800 font-semibold"
                     >
                       <option value="">Select Employee</option>
-                      {employeesList.map((emp: any) => (
-                        <option key={emp.id || emp._id} value={emp.id || emp._id}>
+                      {employeesList.map((emp) => (
+                        <option key={emp.id} value={emp.id}>
                           {emp.firstName} {emp.lastName}
                         </option>
                       ))}
