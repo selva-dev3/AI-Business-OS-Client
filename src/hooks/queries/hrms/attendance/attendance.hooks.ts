@@ -51,3 +51,20 @@ export function useUpdateAttendance(id: string) {
     },
   });
 }
+
+export function useCreateAttendance() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: {
+      employeeId: string;
+      date: string;
+      status: string;
+      checkIn?: string | null;
+      checkOut?: string | null;
+      notes?: string | null;
+    }) => attendanceApi.create(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: attendanceKeys.all });
+    },
+  });
+}

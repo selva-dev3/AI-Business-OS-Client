@@ -20,10 +20,20 @@ export const attendanceApi = {
     apiGet<AttendanceSummary>(`${BASE}/summary${buildQueryString(params ?? {})}`),
 
   checkIn: (data?: CheckInRequest) =>
-    apiPost<AttendanceRecord>(`${BASE}/check-in`, data),
+    apiPost<AttendanceRecord>(`${BASE}/checkin`, data),
 
   checkOut: (data?: CheckOutRequest) =>
-    apiPost<AttendanceRecord>(`${BASE}/check-out`, data),
+    apiPost<AttendanceRecord>(`${BASE}/checkout`, data),
+
+  create: (data: {
+    employeeId: string;
+    date: string;
+    status: string;
+    checkIn?: string | null;
+    checkOut?: string | null;
+    notes?: string | null;
+  }) =>
+    apiPost<AttendanceRecord>(BASE, data),
 
   update: (id: string, data: UpdateAttendanceRequest) =>
     apiPatch<AttendanceRecord>(`${BASE}/${id}`, data),

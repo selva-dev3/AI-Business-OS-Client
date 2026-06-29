@@ -20,6 +20,7 @@ import {
   TrendingUp,
   History,
   FileSpreadsheet,
+  Plus,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -45,8 +46,44 @@ import {
   useCheckIn,
   useCheckOut,
   useUpdateAttendance,
+  useCreateAttendance,
 } from "@/hooks/queries/hrms/attendance/attendance.hooks";
 import { AttendanceRecord, AttendanceStatus } from "@/hooks/queries/hrms/attendance/attendance.types";
+import { useEmployees } from "@/hooks/queries/hrms/employees/employees.hooks";
+import { useDepartments } from "@/hooks/queries/hrms/departments/departments.hooks";
+import { DataTable, Column } from "@/components/shared/datatable";
+
+// Normalize database attendance record structure to frontend representation
+const normalizeAttendance = (record: any): AttendanceRecord => {
+  const employeeRaw = record.employee || record.employeeId;
+  const employee = employeeRaw && typeof employeeRaw === "object"
+    ? {
+        id: employeeRaw.id || employeeRaw._id,
+        firstName: employeeRaw.firstName || "",
+        lastName: employeeRaw.lastName || "",
+        email: employeeRaw.email || "",
+        avatar: employeeRaw.avatar || "",
+        designation: employeeRaw.designation || "",
+        departmentId: employeeRaw.departmentId || "",
+      }
+    : undefined;
+
+  return {
+    id: record.id || record._id,
+    employeeId: typeof employeeRaw === "string" ? employeeRaw : (employeeRaw?.id || employeeRaw?._id || ""),
+    employee,
+    date: record.date ? record.date.split("T")[0] : "",
+    checkIn: record.checkIn || "",
+    checkOut: record.checkOut || "",
+    status: (record.status || "present").toLowerCase() as AttendanceStatus,
+    totalHours: record.totalHours || record.workingHours || 0,
+    isLate: record.isLate || record.status === "LATE",
+    isHalfDay: record.isHalfDay || record.status === "HALF_DAY",
+    notes: record.notes || "",
+    createdAt: record.createdAt || "",
+    updatedAt: record.updatedAt || "",
+  };
+};
 
 export default function AttendancePage() {
   // Filters state
@@ -59,10 +96,20 @@ export default function AttendancePage() {
 
   // Modals state
   const [isEditOpen, setIsEditOpen] = React.useState(false);
+  const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [editingRecord, setEditingRecord] = React.useState<AttendanceRecord | null>(null);
 
   // Form override values
   const [formValues, setFormValues] = React.useState({
+    checkIn: "",
+    checkOut: "",
+    status: "present" as AttendanceStatus,
+    notes: "",
+  });
+
+  const [createFormValues, setCreateFormValues] = React.useState({
+    employeeId: "",
+    date: new Date().toISOString().split("T")[0],
     checkIn: "",
     checkOut: "",
     status: "present" as AttendanceStatus,
@@ -138,16 +185,21 @@ export default function AttendancePage() {
   const checkInMutation = useCheckIn();
   const checkOutMutation = useCheckOut();
   const updateMutation = useUpdateAttendance(editingRecord?.id || "");
+  const createMutation = useCreateAttendance();
+  const { data: employeesData } = useEmployees();
+  const { data: dbDepartments } = useDepartments();
 
-  // Departments static list
-  const departments = [
-    { id: "dept-1", name: "Engineering" },
-    { id: "dept-2", name: "Product & Design" },
-    { id: "dept-3", name: "Sales & Marketing" },
-    { id: "dept-4", name: "Human Resources" },
-    { id: "dept-5", name: "Finance & Legal" },
-    { id: "dept-6", name: "Customer Support" },
-  ];
+  // Departments static list with backend integration
+  const departments = React.useMemo(() => {
+    return dbDepartments || [
+      { id: "dept-1", name: "Engineering" },
+      { id: "dept-2", name: "Product & Design" },
+      { id: "dept-3", name: "Sales & Marketing" },
+      { id: "dept-4", name: "Human Resources" },
+      { id: "dept-5", name: "Finance & Legal" },
+      { id: "dept-6", name: "Customer Support" },
+    ];
+  }, [dbDepartments]);
 
   // High-fidelity fallback database for logs
   const fallbackRecords: AttendanceRecord[] = React.useMemo(() => {
@@ -313,21 +365,20 @@ export default function AttendancePage() {
 
   // Combine server data and local records
   const attendanceList = React.useMemo(() => {
-    const apiData = serverAttendance?.data || [];
+    const apiData = (serverAttendance?.data || []).map(normalizeAttendance);
     const sourceData = apiData.length > 0 ? apiData : localRecords;
 
     // Filter data based on search and filters
     return sourceData.filter((record) => {
-      const nameMatch = record.employee
-        ? `${record.employee.firstName} ${record.employee.lastName}`
-            .toLowerCase()
-            .includes(searchQuery.toLowerCase())
-        : false;
-      const roleMatch = record.employee?.designation?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false;
+      const searchLower = searchQuery.toLowerCase();
+      const matchesSearch = !searchQuery || 
+        (record.employee && `${record.employee.firstName} ${record.employee.lastName}`.toLowerCase().includes(searchLower)) ||
+        (record.employee?.designation?.toLowerCase().includes(searchLower));
+
       const statusMatch = !statusFilter || record.status === statusFilter;
       const deptMatch = !deptFilter || record.employee?.departmentId === deptFilter;
 
-      return (nameMatch || roleMatch) && statusMatch && deptMatch;
+      return matchesSearch && statusMatch && deptMatch;
     });
   }, [serverAttendance, localRecords, searchQuery, statusFilter, deptFilter]);
 
@@ -359,6 +410,7 @@ export default function AttendancePage() {
       avgHours: Math.round(avgHours * 10) / 10,
     };
   }, [attendanceList]);
+
 
   // Handle user check-in button click
   const handleCheckIn = async () => {
@@ -499,6 +551,59 @@ export default function AttendancePage() {
     }
   };
 
+  // Submit create manual attendance form
+  const handleCreateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createFormValues.employeeId) {
+      toast.error("Please select an employee");
+      return;
+    }
+    if (!createFormValues.date) {
+      toast.error("Please select a date");
+      return;
+    }
+    if ((createFormValues.status === "present" || createFormValues.status === "late") && !createFormValues.checkIn) {
+      toast.error("Check-in time is required for active statuses");
+      return;
+    }
+
+    try {
+      // Build ISO strings for checkIn and checkOut if they exist
+      const checkInIso = createFormValues.checkIn
+        ? new Date(`${createFormValues.date}T${createFormValues.checkIn}:00.000Z`).toISOString()
+        : null;
+      const checkOutIso = createFormValues.checkOut
+        ? new Date(`${createFormValues.date}T${createFormValues.checkOut}:00.000Z`).toISOString()
+        : null;
+
+      const payload = {
+        employeeId: createFormValues.employeeId,
+        date: new Date(createFormValues.date).toISOString(),
+        status: createFormValues.status.toUpperCase(), // Server expects uppercase status
+        checkIn: checkInIso,
+        checkOut: checkOutIso,
+        notes: createFormValues.notes || "",
+      };
+
+      await createMutation.mutateAsync(payload);
+      toast.success("Manual attendance record created successfully!");
+      setIsCreateOpen(false);
+      // Reset form values
+      setCreateFormValues({
+        employeeId: "",
+        date: new Date().toISOString().split("T")[0],
+        checkIn: "",
+        checkOut: "",
+        status: "present",
+        notes: "",
+      });
+      refetch();
+    } catch (err: any) {
+      const serverMsg = err?.response?.data?.message || err?.message;
+      toast.error(serverMsg || "Failed to create manual attendance");
+    }
+  };
+
   // Helper styles for status badges
   const getStatusBadge = (status: AttendanceStatus) => {
     switch (status) {
@@ -529,6 +634,100 @@ export default function AttendancePage() {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
+  // Column definitions for the DataTable component
+  const attendanceColumns = React.useMemo<Column<AttendanceRecord>[]>(() => [
+    {
+      header: "Employee",
+      cell: (record) => {
+        const emp = record.employee;
+        const deptName = departments.find((d) => d.id === emp?.departmentId)?.name || "Corporate";
+        return (
+          <div className="flex items-center gap-3">
+            <Avatar className="h-9 w-9 rounded-full border border-slate-100 bg-indigo-50">
+              <AvatarFallback className="text-indigo-700 bg-indigo-50 text-[11px] font-bold">
+                {emp ? getInitials(emp.firstName, emp.lastName) : "EM"}
+              </AvatarFallback>
+            </Avatar>
+            <div>
+              <p className="font-semibold text-slate-900 leading-tight">
+                {emp ? `${emp.firstName} ${emp.lastName}` : "Unknown Employee"}
+              </p>
+              <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
+                <Building className="h-3.5 w-3.5" />
+                {deptName}
+              </p>
+            </div>
+          </div>
+        );
+      },
+      className: "py-3.5 px-6",
+    },
+    {
+      header: "Status",
+      cell: (record) => getStatusBadge(record.status),
+      className: "py-3.5 px-6 text-center",
+    },
+    {
+      header: "Check-In",
+      cell: (record) => formatTime(record.checkIn),
+      className: "py-3.5 px-6 text-center text-xs font-semibold text-slate-800",
+    },
+    {
+      header: "Check-Out",
+      cell: (record) => formatTime(record.checkOut),
+      className: "py-3.5 px-6 text-center text-xs font-semibold text-slate-800",
+    },
+    {
+      header: "Hours Worked",
+      cell: (record) => {
+        const worked = record.totalHours || 0;
+        const progressPercent = Math.min((worked / 8) * 100, 100);
+        return (
+          <div className="flex items-center justify-center gap-2">
+            {worked > 0 ? (
+              <>
+                <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden shrink-0">
+                  <div
+                    className={cn(
+                      "h-full rounded-full",
+                      worked >= 8 ? "bg-emerald-500" : "bg-amber-500"
+                    )}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+                <span className="text-xs font-bold text-slate-700 shrink-0">
+                  {worked}h
+                </span>
+              </>
+            ) : (
+              <span className="text-xs text-slate-400 font-medium">-</span>
+            )}
+          </div>
+        );
+      },
+      className: "py-3.5 px-6",
+    },
+    {
+      header: "Remarks / Note",
+      cell: (record) => record.notes || "--",
+      className: "py-3.5 px-6 text-xs text-slate-500 max-w-[200px] truncate",
+    },
+    {
+      header: "Actions",
+      cell: (record) => (
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => handleOpenEdit(record)}
+          className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
+        >
+          <Edit2 className="h-3.5 w-3.5" />
+        </Button>
+      ),
+      className: "py-3.5 px-6 text-center",
+    },
+  ], [departments, handleOpenEdit]);
+
   return (
     <div className="p-6 space-y-6 w-full">
       {/* Page Header */}
@@ -542,6 +741,14 @@ export default function AttendancePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            onClick={() => setIsCreateOpen(true)}
+            size="sm"
+            className="bg-indigo-600 text-white hover:bg-indigo-700 font-semibold shadow-xs flex items-center gap-2"
+          >
+            <Plus className="h-4 w-4" />
+            Create Attendance
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -784,113 +991,12 @@ export default function AttendancePage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/55 text-slate-400 text-[11px] font-bold uppercase tracking-wider">
-                  <th className="py-3.5 px-6">Employee</th>
-                  <th className="py-3.5 px-6 text-center">Status</th>
-                  <th className="py-3.5 px-6 text-center">Check-In</th>
-                  <th className="py-3.5 px-6 text-center">Check-Out</th>
-                  <th className="py-3.5 px-6 text-center">Hours Worked</th>
-                  <th className="py-3.5 px-6">Remarks / Note</th>
-                  <th className="py-3.5 px-6 text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm text-slate-600">
-                {isLoading ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
-                      <span className="animate-pulse">Loading compliance data...</span>
-                    </td>
-                  </tr>
-                ) : attendanceList.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-400">
-                      <AlertCircle className="h-6 w-6 mx-auto text-slate-300 mb-2" />
-                      <span className="text-xs font-semibold">No logs match the current query criteria</span>
-                    </td>
-                  </tr>
-                ) : (
-                  attendanceList.map((record) => {
-                    const emp = record.employee;
-                    const deptName = departments.find((d) => d.id === emp?.departmentId)?.name || "Corporate";
-                    
-                    // Circular progress properties for total hours worked (target 8h)
-                    const worked = record.totalHours || 0;
-                    const progressPercent = Math.min((worked / 8) * 100, 100);
-
-                    return (
-                      <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3.5 px-6">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-9 w-9 rounded-full border border-slate-100 bg-indigo-50">
-                              <AvatarFallback className="text-indigo-700 bg-indigo-50 text-[11px] font-bold">
-                                {emp ? getInitials(emp.firstName, emp.lastName) : "EM"}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <p className="font-semibold text-slate-900 leading-tight">
-                                {emp ? `${emp.firstName} ${emp.lastName}` : "Unknown Employee"}
-                              </p>
-                              <p className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                                <Building className="h-3 w-3" />
-                                {deptName}
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-6 text-center">
-                          {getStatusBadge(record.status)}
-                        </td>
-                        <td className="py-3.5 px-6 text-center text-xs font-semibold text-slate-800">
-                          {formatTime(record.checkIn)}
-                        </td>
-                        <td className="py-3.5 px-6 text-center text-xs font-semibold text-slate-800">
-                          {formatTime(record.checkOut)}
-                        </td>
-                        <td className="py-3.5 px-6">
-                          <div className="flex items-center justify-center gap-2">
-                            {worked > 0 ? (
-                              <>
-                                <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden shrink-0">
-                                  <div
-                                    className={cn(
-                                      "h-full rounded-full",
-                                      worked >= 8 ? "bg-emerald-500" : "bg-amber-500"
-                                    )}
-                                    style={{ width: `${progressPercent}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs font-bold text-slate-700 shrink-0">
-                                  {worked}h
-                                </span>
-                              </>
-                            ) : (
-                              <span className="text-xs text-slate-400 font-medium">-</span>
-                            )}
-                          </div>
-                        </td>
-                        <td className="py-3.5 px-6 text-xs text-slate-500 max-w-[200px] truncate">
-                          {record.notes || "--"}
-                        </td>
-                        <td className="py-3.5 px-6 text-center">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenEdit(record)}
-                            className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
-                          >
-                            <Edit2 className="h-3.5 w-3.5" />
-                          </Button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            data={attendanceList}
+            columns={attendanceColumns}
+            isLoading={isLoading}
+            emptyMessage="No logs match the current query criteria"
+          />
         </CardContent>
       </Card>
 
@@ -972,6 +1078,117 @@ export default function AttendancePage() {
                 className="bg-indigo-600 text-white hover:bg-indigo-700"
               >
                 Apply Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Manual Attendance Modal */}
+      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+        <DialogContent className="max-w-md bg-white border border-slate-200 rounded-xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900">
+              Create Manual Attendance Log
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              Manually add a daily attendance log for any employee.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleCreateSubmit} className="space-y-4 py-2">
+            {/* Employee Selection */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Employee</label>
+              <select
+                value={createFormValues.employeeId}
+                onChange={(e) => setCreateFormValues({ ...createFormValues, employeeId: e.target.value })}
+                className="w-full h-9 px-2 text-sm bg-white rounded-lg border border-slate-200 focus:outline-hidden"
+                required
+              >
+                <option value="">Select Employee</option>
+                {(employeesData?.employees || employeesData?.data || []).map((emp: any) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.firstName} {emp.lastName}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Date Input */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Date</label>
+              <Input
+                type="date"
+                value={createFormValues.date}
+                onChange={(e) => setCreateFormValues({ ...createFormValues, date: e.target.value })}
+                required
+              />
+            </div>
+
+            {/* Status input */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Attendance Status</label>
+              <select
+                value={createFormValues.status}
+                onChange={(e) => setCreateFormValues({ ...createFormValues, status: e.target.value as AttendanceStatus })}
+                className="w-full h-9 px-2 text-sm bg-white rounded-lg border border-slate-200 focus:outline-hidden"
+              >
+                <option value="present">Present</option>
+                <option value="late">Late</option>
+                <option value="half_day">Half Day</option>
+                <option value="absent">Absent</option>
+                <option value="on_leave">On Leave</option>
+              </select>
+            </div>
+
+            {/* Check-In and Check-Out Time Inputs */}
+            {createFormValues.status !== "absent" && createFormValues.status !== "on_leave" && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Check-In Time</label>
+                  <Input
+                    type="time"
+                    value={createFormValues.checkIn}
+                    onChange={(e) => setCreateFormValues({ ...createFormValues, checkIn: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-slate-600">Check-Out Time</label>
+                  <Input
+                    type="time"
+                    value={createFormValues.checkOut}
+                    onChange={(e) => setCreateFormValues({ ...createFormValues, checkOut: e.target.value })}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Reason/Notes Input */}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Adjustment Note / Remark</label>
+              <Input
+                placeholder="Manual entry notes..."
+                value={createFormValues.notes}
+                onChange={(e) => setCreateFormValues({ ...createFormValues, notes: e.target.value })}
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCreateOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                className="bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                Create Record
               </Button>
             </DialogFooter>
           </form>
