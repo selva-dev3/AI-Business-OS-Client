@@ -61,6 +61,6 @@ export type CheckOutRequest = {
 export type UpdateAttendanceRequest = {
   checkIn?: string;
   checkOut?: string;
-  status?: AttendanceStatus;
+  status?: AttendanceStatus | string;
   notes?: string;
 };

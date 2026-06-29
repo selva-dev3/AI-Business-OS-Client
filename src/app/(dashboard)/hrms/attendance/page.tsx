@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   Clock,
   UserCheck,
@@ -86,6 +87,7 @@ const normalizeAttendance = (record: any): AttendanceRecord => {
 };
 
 export default function AttendancePage() {
+  const router = useRouter();
   // Filters state
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("");
@@ -509,7 +511,7 @@ export default function AttendancePage() {
       const requestData = {
         checkIn: formValues.checkIn ? new Date(`${dateFilter}T${formValues.checkIn}:00.000Z`).toISOString() : undefined,
         checkOut: formValues.checkOut ? new Date(`${dateFilter}T${formValues.checkOut}:00.000Z`).toISOString() : undefined,
-        status: formValues.status,
+        status: formValues.status.toUpperCase(),
         notes: formValues.notes,
       };
 
@@ -718,7 +720,10 @@ export default function AttendancePage() {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => handleOpenEdit(record)}
+          onClick={(e) => {
+            e.stopPropagation();
+            handleOpenEdit(record);
+          }}
           className="h-8 w-8 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md"
         >
           <Edit2 className="h-3.5 w-3.5" />
@@ -996,6 +1001,7 @@ export default function AttendancePage() {
             columns={attendanceColumns}
             isLoading={isLoading}
             emptyMessage="No logs match the current query criteria"
+            onRowClick={(row) => router.push(`/hrms/attendance/${row.id}`)}
           />
         </CardContent>
       </Card>

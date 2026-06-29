@@ -37,4 +37,7 @@ export const attendanceApi = {
 
   update: (id: string, data: UpdateAttendanceRequest) =>
     apiPatch<AttendanceRecord>(`${BASE}/${id}`, data),
+
+  getById: (id: string) =>
+    apiGet<AttendanceRecord>(`${BASE}/${id}`),
 } as const;

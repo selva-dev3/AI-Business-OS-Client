@@ -68,3 +68,11 @@ export function useCreateAttendance() {
     },
   });
 }
+
+export function useAttendanceDetails(id: string) {
+  return useQuery({
+    queryKey: ["attendance", "details", id],
+    queryFn: () => attendanceApi.getById(id),
+    enabled: !!id,
+  });
+}
