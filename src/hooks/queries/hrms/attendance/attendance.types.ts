@@ -147,6 +147,19 @@ export type ApproveRejectRegularizationPayload = {
   comments?: string;
 };
 
+export type RegularizationListResponse = {
+  data: RegularizationRecord[];
+  meta: PaginationMeta;
+};
+
+export type RegularizationSearchParams = ListParams & {
+  employeeId?: string;
+  status?: string;
+  date?: string;
+  fromDate?: string;
+  toDate?: string;
+};
+
 // ─── ATTENDANCE REPORTS ────────────────────────────────────────────────────────
 
 export type AttendanceReportItem = {

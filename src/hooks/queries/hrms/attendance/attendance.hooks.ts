@@ -10,6 +10,7 @@ import {
   CreateRegularizationPayload,
   ApproveRejectRegularizationPayload,
   UpdateAttendanceRequest,
+  RegularizationSearchParams,
 } from "./attendance.types";
 
 export function useAttendanceList(params?: AttendanceSearchParams) {
@@ -113,6 +114,13 @@ export function useApproveRejectRegularization() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: attendanceKeys.all });
     },
+  });
+}
+
+export function useRegularizationsList(params?: RegularizationSearchParams) {
+  return useQuery({
+    queryKey: attendanceKeys.regularizationList(params),
+    queryFn: () => attendanceApi.listRegularizations(params),
   });
 }
 

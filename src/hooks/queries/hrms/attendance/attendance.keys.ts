@@ -1,4 +1,4 @@
-import { AttendanceSearchParams, AttendanceReportParams } from "./attendance.types";
+import { AttendanceSearchParams, AttendanceReportParams, RegularizationSearchParams } from "./attendance.types";
 
 export const attendanceKeys = {
   all: ["attendance"] as const,
@@ -8,4 +8,6 @@ export const attendanceKeys = {
   summary: (params?: { date?: string }) => [...attendanceKeys.summaries(), params] as const,
   reports: () => [...attendanceKeys.all, "report"] as const,
   report: (params?: AttendanceReportParams) => [...attendanceKeys.reports(), params] as const,
+  regularizations: () => [...attendanceKeys.all, "regularization"] as const,
+  regularizationList: (params?: RegularizationSearchParams) => [...attendanceKeys.regularizations(), params] as const,
 } as const;

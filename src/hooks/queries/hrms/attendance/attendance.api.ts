@@ -15,6 +15,8 @@ import {
   RegularizationRecord,
   ApproveRejectRegularizationPayload,
   UpdateAttendanceRequest,
+  RegularizationListResponse,
+  RegularizationSearchParams,
 } from "./attendance.types";
 
 const BASE = "/hrms/attendance";
@@ -58,6 +60,9 @@ export const attendanceApi = {
 
   approveRejectRegularization: (id: string, data: ApproveRejectRegularizationPayload) =>
     apiPatch<RegularizationRecord>(`${BASE}/regularize/${id}`, data),
+
+  listRegularizations: (params?: RegularizationSearchParams) =>
+    apiGet<RegularizationListResponse>(`${BASE}/regularization${buildQueryString(params ?? {})}`),
 
   // ─── REPORTS ─────────────────────────────────────────────────────────────
   getAttendanceReport: (params?: AttendanceReportParams) =>

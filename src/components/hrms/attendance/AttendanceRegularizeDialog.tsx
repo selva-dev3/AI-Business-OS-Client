@@ -25,6 +25,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useCreateRegularization } from "@/hooks/queries/hrms/attendance/attendance.hooks";
+import { useEmployees } from "@/hooks/queries/hrms/employees/employees.hooks";
+import { useAuthStore } from "@/store/authStore";
 
 const regularizeSchema = z.object({
   employeeId: z.string().min(1, "Employee is required"),
@@ -43,6 +45,10 @@ interface AttendanceRegularizeDialogProps {
     lastName: string;
     employeeCode?: string;
   } | null;
+  attendanceRecord?: {
+    checkIn?: string;
+    checkOut?: string;
+  } | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
@@ -54,19 +60,31 @@ function toLocalDateString(date: Date): string {
 
 export function AttendanceRegularizeDialog({
   employee,
+  attendanceRecord,
   open,
   onOpenChange,
   onSuccess,
 }: AttendanceRegularizeDialogProps) {
   const createRegularization = useCreateRegularization();
+  const user = useAuthStore((s) => s.user);
+  const { data: employeesData } = useEmployees();
+
+  const employeesList = React.useMemo(() => {
+    return (employeesData?.employees || employeesData?.data || []) as any[];
+  }, [employeesData]);
+
+  const selfEmployee = React.useMemo(() => {
+    if (!user?.email || !employeesList.length) return null;
+    return employeesList.find((emp) => emp.email?.toLowerCase() === user.email.toLowerCase()) || null;
+  }, [user, employeesList]);
 
   const defaultValues = React.useMemo<RegularizeFormValues>(() => ({
-    employeeId: employee?.id || "",
+    employeeId: employee?.id || selfEmployee?.id || "",
     date: toLocalDateString(new Date()),
     checkIn: "",
     checkOut: "",
     reason: "",
-  }), [employee]);
+  }), [employee, selfEmployee]);
 
   const form = useForm<RegularizeFormValues>({
     resolver: zodResolver(regularizeSchema),
@@ -77,8 +95,14 @@ export function AttendanceRegularizeDialog({
     form.reset(defaultValues);
   }, [defaultValues, form]);
 
-  const employeeName = employee
-    ? `${employee.firstName} ${employee.lastName}`
+  const watchedEmployeeId = form.watch("employeeId");
+  const selectedEmployee = React.useMemo(() => {
+    if (employee) return employee;
+    return employeesList.find((emp) => emp.id === watchedEmployeeId) || null;
+  }, [employee, employeesList, watchedEmployeeId]);
+
+  const employeeName = selectedEmployee
+    ? `${selectedEmployee.firstName} ${selectedEmployee.lastName}`
     : "employee";
 
   const handleSubmit = async (values: RegularizeFormValues) => {
@@ -122,36 +146,68 @@ export function AttendanceRegularizeDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
-              <div>
-                <FormLabel className="text-[10px] font-semibold text-slate-400 uppercase">
-                  Employee
-                </FormLabel>
-                <p className="text-sm font-semibold text-slate-800">
-                  {employee ? `${employee.firstName} ${employee.lastName}` : "—"}
-                </p>
+            {employee ? (
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                <div>
+                  <FormLabel className="text-[10px] font-semibold text-slate-400 uppercase">
+                    Employee
+                  </FormLabel>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {employee ? `${employee.firstName} ${employee.lastName}` : "—"}
+                  </p>
+                </div>
+                <div>
+                  <FormLabel className="text-[10px] font-semibold text-slate-400 uppercase">
+                    Employee ID
+                  </FormLabel>
+                  <p className="text-sm font-semibold text-slate-800">
+                    {employee?.employeeCode || "—"}
+                  </p>
+                </div>
               </div>
-              <div>
-                <FormLabel className="text-[10px] font-semibold text-slate-400 uppercase">
-                  Employee ID
-                </FormLabel>
-                <p className="text-sm font-semibold text-slate-800">
-                  {employee?.employeeCode || "—"}
-                </p>
-              </div>
-            </div>
+            ) : (
+              <FormField
+                control={form.control}
+                name="employeeId"
+                render={({ field }) => (
+                  <FormItem className="space-y-1.5">
+                    <FormLabel className="text-xs font-semibold text-slate-700">
+                      Employee <span className="text-rose-500">*</span>
+                    </FormLabel>
+                    <FormControl>
+                      <select
+                        value={field.value}
+                        onChange={field.onChange}
+                        className="w-full h-9 px-2 text-sm bg-white rounded-lg border border-slate-200 focus:outline-hidden"
+                        required
+                      >
+                        <option value="">Select Employee</option>
+                        {employeesList.map((emp: any) => (
+                          <option key={emp.id} value={emp.id}>
+                            {emp.firstName} {emp.lastName}
+                          </option>
+                        ))}
+                      </select>
+                    </FormControl>
+                    <FormMessage className="text-[11px]" />
+                  </FormItem>
+                )}
+              />
+            )}
 
-            <FormField
-              control={form.control}
-              name="employeeId"
-              render={({ field }) => (
-                <FormItem className="hidden">
-                  <FormControl>
-                    <Input {...field} type="hidden" />
-                  </FormControl>
-                </FormItem>
-              )}
-            />
+            {employee && (
+              <FormField
+                control={form.control}
+                name="employeeId"
+                render={({ field }) => (
+                  <FormItem className="hidden">
+                    <FormControl>
+                      <Input {...field} type="hidden" />
+                    </FormControl>
+                  </FormItem>
+                )}
+              />
+            )}
 
             <FormField
               control={form.control}
@@ -168,6 +224,27 @@ export function AttendanceRegularizeDialog({
                 </FormItem>
               )}
             />
+
+            {attendanceRecord && (
+              <div className="grid grid-cols-2 gap-3 bg-amber-50/40 p-3 rounded-lg border border-amber-100/50">
+                <div>
+                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
+                    Original Check-In
+                  </span>
+                  <p className="text-xs font-semibold text-amber-900 mt-0.5">
+                    {attendanceRecord.checkIn ? new Date(attendanceRecord.checkIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                  </p>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">
+                    Original Check-Out
+                  </span>
+                  <p className="text-xs font-semibold text-amber-900 mt-0.5">
+                    {attendanceRecord.checkOut ? new Date(attendanceRecord.checkOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <FormField
