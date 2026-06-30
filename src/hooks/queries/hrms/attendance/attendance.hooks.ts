@@ -117,10 +117,18 @@ export function useApproveRejectRegularization() {
   });
 }
 
-export function useRegularizationsList(params?: RegularizationSearchParams) {
+export function useRegularizationsList(params?: RegularizationSearchParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: attendanceKeys.regularizationList(params),
     queryFn: () => attendanceApi.listRegularizations(params),
+    ...options,
+  });
+}
+
+export function useRegularizationDetails(id: string) {
+  return useQuery({
+    queryKey: attendanceKeys.regularizationDetails(id),
+    queryFn: () => attendanceApi.getRegularizationById(id),
   });
 }
 

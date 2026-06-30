@@ -10,4 +10,5 @@ export const attendanceKeys = {
   report: (params?: AttendanceReportParams) => [...attendanceKeys.reports(), params] as const,
   regularizations: () => [...attendanceKeys.all, "regularization"] as const,
   regularizationList: (params?: RegularizationSearchParams) => [...attendanceKeys.regularizations(), params] as const,
+  regularizationDetails: (id: string) => [...attendanceKeys.regularizations(), "detail", id] as const,
 } as const;

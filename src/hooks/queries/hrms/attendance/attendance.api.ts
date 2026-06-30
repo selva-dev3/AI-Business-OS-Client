@@ -64,6 +64,9 @@ export const attendanceApi = {
   listRegularizations: (params?: RegularizationSearchParams) =>
     apiGet<RegularizationListResponse>(`${BASE}/regularization${buildQueryString(params ?? {})}`),
 
+  getRegularizationById: (id: string) =>
+    apiGet<RegularizationRecord>(`${BASE}/regularization/${id}`),
+
   // ─── REPORTS ─────────────────────────────────────────────────────────────
   getAttendanceReport: (params?: AttendanceReportParams) =>
     apiGet<AttendanceReportItem[]>(`/hrms/reports/attendance${buildQueryString(params ?? {})}`),
