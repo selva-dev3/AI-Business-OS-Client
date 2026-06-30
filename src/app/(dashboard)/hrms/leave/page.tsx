@@ -59,15 +59,19 @@ import {
   useLeaveTypes,
   useUpdateLeaveType,
   useDeleteLeaveType,
+  useHolidays,
+  useCreateHoliday,
+  useUpdateHoliday,
+  useDeleteHoliday,
 } from "@/hooks/queries/hrms/leave/leave.hooks";
-import { LeaveRequest, LeaveBalance, LeaveType, LeaveStatus, LeaveTypeOption } from "@/hooks/queries/hrms/leave/leave.types";
+import { LeaveRequest, LeaveBalance, LeaveType, LeaveStatus, LeaveTypeOption, Holiday, HolidayType } from "@/hooks/queries/hrms/leave/leave.types";
 import { Employee } from "@/hooks/queries/hrms/employees/employees.types";
 import { leaveApi } from "@/hooks/queries/hrms/leave/leave.api";
 import { DataTable, Column } from "@/components/shared/datatable";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 export default function LeavePage() {
-  const [topTab, setTopTab] = React.useState<"requests" | "types">("requests");
+  const [topTab, setTopTab] = React.useState<"requests" | "types" | "holidays">("requests");
   const [activeTab, setActiveTab] = React.useState<"my-requests" | "team-approvals" | "outages">("my-requests");
   
   // Search & Filter state
@@ -111,9 +115,37 @@ export default function LeavePage() {
   const [leaveTypeToDelete, setLeaveTypeToDelete] = React.useState<string | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false);
 
+  // ─── HOLIDAY STATE ──────────────────────────────────────────────────────────
+  const [isCreateHolidayModalOpen, setIsCreateHolidayModalOpen] = React.useState(false);
+  const [holidayForm, setHolidayForm] = React.useState({
+    name: "",
+    date: "",
+    type: "PUBLIC" as HolidayType,
+    isOptional: false,
+  });
+  const [holidaySubmitting, setHolidaySubmitting] = React.useState(false);
+  const [holidayError, setHolidayError] = React.useState<string | null>(null);
+
+  const [isEditHolidayModalOpen, setIsEditHolidayModalOpen] = React.useState(false);
+  const [editingHoliday, setEditingHoliday] = React.useState<Holiday | null>(null);
+  const [editHolidayForm, setEditHolidayForm] = React.useState({
+    name: "",
+    date: "",
+    type: "PUBLIC" as HolidayType,
+    isOptional: false,
+  });
+  const [editHolidaySubmitting, setEditHolidaySubmitting] = React.useState(false);
+  const [editHolidayError, setEditHolidayError] = React.useState<string | null>(null);
+
+  const [holidayToDelete, setHolidayToDelete] = React.useState<string | null>(null);
+  const [isDeleteHolidayConfirmOpen, setIsDeleteHolidayConfirmOpen] = React.useState(false);
+
   // Mutations
   const updateLeaveTypeMutation = useUpdateLeaveType();
   const deleteLeaveTypeMutation = useDeleteLeaveType();
+  const createHolidayMutation = useCreateHoliday();
+  const updateHolidayMutation = useUpdateHoliday();
+  const deleteHolidayMutation = useDeleteHoliday();
 
   // Leave Form values
   const [formValues, setFormValues] = React.useState({
@@ -143,6 +175,7 @@ export default function LeavePage() {
   const cancelMutation = useCancelLeave();
 
   const { data: leaveTypes, isLoading: isLoadingLeaveTypes, isError: isLeaveTypesError, refetch: refetchLeaveTypes } = useLeaveTypes();
+  const { data: holidays, isLoading: isLoadingHolidays, refetch: refetchHolidays } = useHolidays();
 
   // Static departments mapping
   const departments = [
@@ -429,10 +462,185 @@ export default function LeavePage() {
     }
   };
 
+  // ─── HOLIDAY HANDLERS ──────────────────────────────────────────────────────
+  const handleCreateHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setHolidayError(null);
+    if (!holidayForm.name || !holidayForm.date) {
+      setHolidayError("Please fill in all required fields.");
+      return;
+    }
+    setHolidaySubmitting(true);
+    try {
+      await createHolidayMutation.mutateAsync({
+        name: holidayForm.name,
+        date: holidayForm.date,
+        type: holidayForm.type,
+        isOptional: holidayForm.isOptional,
+      });
+      toast.success("Holiday created successfully!");
+      setIsCreateHolidayModalOpen(false);
+      setHolidayForm({ name: "", date: "", type: "PUBLIC", isOptional: false });
+      refetchHolidays();
+    } catch (err) {
+      setHolidayError(err instanceof Error ? err.message : "Failed to create holiday.");
+    } finally {
+      setHolidaySubmitting(false);
+    }
+  };
+
+  const handleEditHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditHolidayError(null);
+    if (!editHolidayForm.name || !editHolidayForm.date || !editingHoliday) {
+      setEditHolidayError("Please fill in all required fields.");
+      return;
+    }
+    setEditHolidaySubmitting(true);
+    try {
+      await updateHolidayMutation.mutateAsync({
+        id: editingHoliday._id,
+        data: {
+          name: editHolidayForm.name,
+          date: editHolidayForm.date,
+          type: editHolidayForm.type,
+          isOptional: editHolidayForm.isOptional,
+        },
+      });
+      toast.success("Holiday updated successfully!");
+      setIsEditHolidayModalOpen(false);
+      setEditingHoliday(null);
+      refetchHolidays();
+    } catch (err) {
+      setEditHolidayError(err instanceof Error ? err.message : "Failed to update holiday.");
+    } finally {
+      setEditHolidaySubmitting(false);
+    }
+  };
+
+  const handleDeleteHoliday = React.useCallback((id: string) => {
+    setHolidayToDelete(id);
+    setIsDeleteHolidayConfirmOpen(true);
+  }, []);
+
+  const confirmDeleteHoliday = async () => {
+    if (!holidayToDelete) return;
+    try {
+      await deleteHolidayMutation.mutateAsync(holidayToDelete);
+      toast.success("Holiday deleted successfully!");
+      refetchHolidays();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete holiday.");
+    } finally {
+      setIsDeleteHolidayConfirmOpen(false);
+      setHolidayToDelete(null);
+    }
+  };
+
   // Calendar dates details showing away employees (Today or upcoming)
   const calendarEvents = React.useMemo(() => {
     return requestsList.filter((req) => req.status === "approved");
-  }, [requestsList]);  const leaveTypeColumns = React.useMemo<Column<any>[]>(() => [
+  }, [requestsList]);
+
+  // ─── HOLIDAY COLUMNS ───────────────────────────────────────────────────────
+  const holidayColumns = React.useMemo<Column<any>[]>(() => [
+    {
+      header: "Holiday Name",
+      cell: (h) => (
+        <span className="font-semibold text-slate-800">{h.name}</span>
+      ),
+      className: "px-6",
+    },
+    {
+      header: "Date",
+      cell: (h) => {
+        const d = new Date(h.date);
+        return (
+          <span className="text-slate-600 text-sm">
+            {d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+          </span>
+        );
+      },
+      className: "px-6",
+    },
+    {
+      header: "Day",
+      cell: (h) => {
+        const d = new Date(h.date);
+        return (
+          <span className="text-slate-500 text-sm">
+            {d.toLocaleDateString("en-IN", { weekday: "long" })}
+          </span>
+        );
+      },
+      className: "px-6",
+    },
+    {
+      header: "Type",
+      cell: (h) => {
+        const typeColors: Record<string, string> = {
+          PUBLIC: "bg-emerald-50 text-emerald-700 border-emerald-200",
+          RESTRICTED: "bg-amber-50 text-amber-700 border-amber-200",
+          OPTIONAL: "bg-sky-50 text-sky-700 border-sky-200",
+        };
+        return (
+          <Badge variant="outline" className={cn("text-xs font-medium capitalize", typeColors[h.type] || "bg-slate-50 text-slate-600")}>
+            {(h.type || "public").toLowerCase()}
+          </Badge>
+        );
+      },
+      className: "px-6",
+    },
+    {
+      header: "Optional",
+      cell: (h) => (
+        <Badge variant="outline" className={cn("text-xs font-medium", h.isOptional ? "bg-amber-50 text-amber-600 border-amber-200" : "bg-slate-50 text-slate-500 border-slate-200")}>
+          {h.isOptional ? "Optional" : "Mandatory"}
+        </Badge>
+      ),
+      className: "px-6",
+    },
+    {
+      header: "",
+      cell: (h) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg">
+              <MoreHorizontal className="h-4 w-4 text-slate-500" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md">
+            <DropdownMenuItem
+              onClick={() => {
+                setEditingHoliday(h);
+                setEditHolidayForm({
+                  name: h.name,
+                  date: h.date ? new Date(h.date).toISOString().split("T")[0] : "",
+                  type: h.type || "PUBLIC",
+                  isOptional: h.isOptional || false,
+                });
+                setIsEditHolidayModalOpen(true);
+              }}
+              className="cursor-pointer flex items-center"
+            >
+              <Edit2 className="mr-2 h-4 w-4 text-slate-500" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleDeleteHoliday(h._id || h.id)}
+              className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 cursor-pointer flex items-center"
+            >
+              <Trash2 className="mr-2 h-4 w-4 text-rose-500" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+      className: "text-right px-6",
+    },
+  ], [handleDeleteHoliday]);
+
+  const leaveTypeColumns = React.useMemo<Column<any>[]>(() => [
     {
       header: "Leave Name",
       cell: (lt) => (
@@ -760,6 +968,22 @@ export default function LeavePage() {
           <Calendar className="h-4 w-4 shrink-0" />
           Leave Types
         </Button>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setTopTab("holidays");
+            refetchHolidays();
+          }}
+          className={cn(
+            "rounded-none border-b-2 pb-3 px-4 font-semibold text-sm transition-all -mb-[1px] flex items-center gap-2 h-auto hover:bg-transparent hover:text-indigo-600 bg-transparent text-slate-500 shadow-none border-t-0 border-x-0",
+            topTab === "holidays"
+              ? "border-indigo-600 text-indigo-600 font-bold"
+              : "border-transparent hover:border-slate-300"
+          )}
+        >
+          <Calendar className="h-4 w-4 shrink-0" />
+          Holidays
+        </Button>
       </div>
 
       {topTab === "requests" ? (
@@ -1019,7 +1243,7 @@ export default function LeavePage() {
           )}
           </div>
         </>
-      ) : (
+      ) : topTab === "types" ? (
         <Card className="border-slate-200 bg-white shadow-xs">
           <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
             <div>
@@ -1038,7 +1262,34 @@ export default function LeavePage() {
             />
           </CardContent>
         </Card>
-      )}
+      ) : topTab === "holidays" ? (
+        <Card className="border-slate-200 bg-white shadow-xs">
+          <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-sm font-bold text-slate-800">Company Holidays</CardTitle>
+              <CardDescription className="text-xs">
+                Public, restricted, and optional holidays for the current year.
+              </CardDescription>
+            </div>
+            <Button
+              size="sm"
+              onClick={() => setIsCreateHolidayModalOpen(true)}
+              className="flex items-center gap-1.5 bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add Holiday
+            </Button>
+          </CardHeader>
+          <CardContent className="p-0">
+            <DataTable
+              data={holidays || []}
+              columns={holidayColumns}
+              isLoading={isLoadingHolidays}
+              emptyMessage="No holidays found. Add one using the button above."
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* Leave Request Dialog Form */}
       <Dialog open={isRequestOpen} onOpenChange={(open) => {
@@ -1511,6 +1762,190 @@ export default function LeavePage() {
         onCancel={() => {
           setIsDeleteConfirmOpen(false);
           setLeaveTypeToDelete(null);
+        }}
+      />
+
+      {/* Create Holiday Dialog */}
+      <Dialog
+        open={isCreateHolidayModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsCreateHolidayModalOpen(false);
+            setHolidayForm({ name: "", date: "", type: "PUBLIC", isOptional: false });
+            setHolidayError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md bg-white border border-slate-200 rounded-xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900">Add Holiday</DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">Create a new company holiday.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateHoliday} className="space-y-4 py-2">
+            {holidayError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg px-3 py-2 flex items-center gap-2">
+                <AlertCircle className="h-3.5 w-3.5" /> {holidayError}
+              </div>
+            )}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Holiday Name *</label>
+              <Input
+                placeholder="e.g. Republic Day"
+                value={holidayForm.name}
+                onChange={(e) => setHolidayForm({ ...holidayForm, name: e.target.value })}
+                required
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Date *</label>
+              <Input
+                type="date"
+                value={holidayForm.date}
+                onChange={(e) => setHolidayForm({ ...holidayForm, date: e.target.value })}
+                required
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Type</label>
+              <select
+                value={holidayForm.type}
+                onChange={(e) => setHolidayForm({ ...holidayForm, type: e.target.value as HolidayType })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="PUBLIC">Public</option>
+                <option value="RESTRICTED">Restricted</option>
+                <option value="OPTIONAL">Optional</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="isOptional"
+                checked={holidayForm.isOptional}
+                onChange={(e) => setHolidayForm({ ...holidayForm, isOptional: e.target.checked })}
+                className="rounded border-slate-300"
+              />
+              <label htmlFor="isOptional" className="text-xs font-medium text-slate-600">Optional Holiday</label>
+            </div>
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCreateHolidayModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={holidaySubmitting}
+                className="bg-indigo-600 text-white hover:bg-indigo-700 font-semibold disabled:opacity-50"
+              >
+                {holidaySubmitting ? "Creating..." : "Create Holiday"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Holiday Dialog */}
+      <Dialog
+        open={isEditHolidayModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsEditHolidayModalOpen(false);
+            setEditingHoliday(null);
+            setEditHolidayError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md bg-white border border-slate-200 rounded-xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900">Edit Holiday</DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">Update holiday details.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditHoliday} className="space-y-4 py-2">
+            {editHolidayError && (
+              <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-lg px-3 py-2 flex items-center gap-2">
+                <AlertCircle className="h-3.5 w-3.5" /> {editHolidayError}
+              </div>
+            )}
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Holiday Name *</label>
+              <Input
+                placeholder="e.g. Republic Day"
+                value={editHolidayForm.name}
+                onChange={(e) => setEditHolidayForm({ ...editHolidayForm, name: e.target.value })}
+                required
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Date *</label>
+              <Input
+                type="date"
+                value={editHolidayForm.date}
+                onChange={(e) => setEditHolidayForm({ ...editHolidayForm, date: e.target.value })}
+                required
+                className="text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Type</label>
+              <select
+                value={editHolidayForm.type}
+                onChange={(e) => setEditHolidayForm({ ...editHolidayForm, type: e.target.value as HolidayType })}
+                className="w-full border border-slate-200 rounded-md px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="PUBLIC">Public</option>
+                <option value="RESTRICTED">Restricted</option>
+                <option value="OPTIONAL">Optional</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="editIsOptional"
+                checked={editHolidayForm.isOptional}
+                onChange={(e) => setEditHolidayForm({ ...editHolidayForm, isOptional: e.target.checked })}
+                className="rounded border-slate-300"
+              />
+              <label htmlFor="editIsOptional" className="text-xs font-medium text-slate-600">Optional Holiday</label>
+            </div>
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditHolidayModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={editHolidaySubmitting}
+                className="bg-indigo-600 text-white hover:bg-indigo-700 font-semibold disabled:opacity-50"
+              >
+                {editHolidaySubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Holiday Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={isDeleteHolidayConfirmOpen}
+        title="Delete Holiday"
+        description="Are you sure you want to delete this holiday? This action cannot be undone."
+        onConfirm={confirmDeleteHoliday}
+        onCancel={() => {
+          setIsDeleteHolidayConfirmOpen(false);
+          setHolidayToDelete(null);
         }}
       />
 

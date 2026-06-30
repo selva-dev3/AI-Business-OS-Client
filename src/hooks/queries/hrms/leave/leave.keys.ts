@@ -12,4 +12,6 @@ export const leaveKeys = {
   leaveType: (id: string) => [...leaveKeys.all, "leaveType", id] as const,
   leaveRequests: () => [...leaveKeys.all, "leaveRequests"] as const,
   leaveRequest: (id: string) => [...leaveKeys.all, "leaveRequest", id] as const,
+  holidays: (params?: { year?: string; type?: string }) => [...leaveKeys.all, "holidays", params] as const,
+  holiday: (id: string) => [...leaveKeys.all, "holiday", id] as const,
 } as const;

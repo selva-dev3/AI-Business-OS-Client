@@ -13,6 +13,9 @@ import {
   UpdateLeaveTypeData,
   UpdateLeaveRequestData,
   ApproveRejectRequestData,
+  Holiday,
+  CreateHolidayData,
+  UpdateHolidayData,
 } from "./leave.types";
 import { Employee, EmployeeListResponse } from "@/hooks/queries/hrms/employees/employees.types";
 
@@ -20,6 +23,7 @@ const BASE_REQUESTS = "/hrms/leave-requests";
 const BASE_BALANCE = "/hrms/leave-balance";
 const BASE_CALENDAR = "/hrms/leave-calendar";
 const BASE_LEAVE_TYPES = "/hrms/leave-types";
+const BASE_HOLIDAYS = "/hrms/holidays";
 
 /* ────────────────────────────────────────────────────────
  *  Server → Client field normalizer
@@ -154,4 +158,18 @@ export const leaveApi = {
 
   cancel: (id: string) =>
     apiPost<LeaveRequest>(`${BASE_REQUESTS}/${id}/cancel`),
+
+  // ─── HOLIDAYS ──────────────────────────────────────────────────────────────
+
+  getHolidays: (params?: { year?: string; type?: string }) =>
+    apiGet<Holiday[]>(`${BASE_HOLIDAYS}${buildQueryString(params ?? {})}`),
+
+  createHoliday: (data: CreateHolidayData) =>
+    apiPost<Holiday>(BASE_HOLIDAYS, data),
+
+  updateHoliday: (id: string, data: UpdateHolidayData) =>
+    apiPatch<Holiday>(`${BASE_HOLIDAYS}/${id}`, data),
+
+  deleteHoliday: (id: string) =>
+    apiDelete<{ message: string }>(`${BASE_HOLIDAYS}/${id}`),
 } as const;

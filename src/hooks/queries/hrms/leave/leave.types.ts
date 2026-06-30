@@ -128,3 +128,36 @@ export type UpdateLeaveRequestData = {
 export type ApproveRejectRequestData = {
   managerNotes?: string;
 };
+
+// ─── HOLIDAYS ────────────────────────────────────────────────────────────────
+
+export type HolidayType = "PUBLIC" | "RESTRICTED" | "OPTIONAL";
+
+export type Holiday = {
+  _id: string;
+  id?: string;
+  name: string;
+  date: string;
+  type: HolidayType;
+  isOptional: boolean;
+  branchId?: string;
+  companyId: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CreateHolidayData = {
+  name: string;
+  date: string;
+  type: HolidayType;
+  isOptional?: boolean;
+  branchId?: string;
+};
+
+export type UpdateHolidayData = {
+  name?: string;
+  date?: string;
+  type?: HolidayType;
+  isOptional?: boolean;
+  branchId?: string;
+};

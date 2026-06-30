@@ -8,6 +8,8 @@ import {
   UpdateLeaveTypeData,
   UpdateLeaveRequestData,
   ApproveRejectRequestData,
+  CreateHolidayData,
+  UpdateHolidayData,
 } from "./leave.types";
 
 export function useLeaveTypes(options?: { enabled?: boolean }) {
@@ -151,3 +153,45 @@ export function useCancelLeave() {
     },
   });
 }
+
+// ─── HOLIDAYS ────────────────────────────────────────────────────────────────
+
+export function useHolidays(params?: { year?: string; type?: string }) {
+  return useQuery({
+    queryKey: leaveKeys.holidays(params),
+    queryFn: () => leaveApi.getHolidays(params),
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useCreateHoliday() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateHolidayData) => leaveApi.createHoliday(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: leaveKeys.all });
+    },
+  });
+}
+
+export function useUpdateHoliday() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateHolidayData }) =>
+      leaveApi.updateHoliday(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: leaveKeys.all });
+    },
+  });
+}
+
+export function useDeleteHoliday() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => leaveApi.deleteHoliday(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: leaveKeys.all });
+    },
+  });
+}
+
