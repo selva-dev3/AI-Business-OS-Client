@@ -70,7 +70,11 @@ export type LeaveSearchParams = ListParams & {
 export type LeaveTypeOption = {
   _id: string;
   name: string;
+  code: string;
   daysPerYear?: number;
+  maxDays?: number;
+  description?: string;
+  requiresApproval?: boolean;
   isActive?: boolean;
 };
 
@@ -90,6 +94,35 @@ export type CreateLeaveTypeData = {
   description?: string;
   requiresApproval: boolean;
   isActive: boolean;
+};
+
+export type LeaveTypeDetail = {
+  _id: string;
+  name: string;
+  code: string;
+  maxDays: number;
+  description?: string;
+  requiresApproval: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type UpdateLeaveTypeData = {
+  name?: string;
+  code?: string;
+  maxDays?: number;
+  description?: string;
+  requiresApproval?: boolean;
+  isActive?: boolean;
+};
+
+export type UpdateLeaveRequestData = {
+  leaveTypeId?: string;
+  fromDate?: string;
+  toDate?: string;
+  reason?: string;
+  emergencyContact?: string;
 };
 
 export type ApproveRejectRequestData = {

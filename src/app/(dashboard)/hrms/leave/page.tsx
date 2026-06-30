@@ -20,6 +20,9 @@ import {
   MapPin,
   Phone,
   Loader2,
+  MoreHorizontal,
+  Edit2,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -37,6 +40,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Import leave hooks and types
 import {
@@ -48,13 +57,17 @@ import {
   useRejectLeave,
   useCancelLeave,
   useLeaveTypes,
+  useUpdateLeaveType,
+  useDeleteLeaveType,
 } from "@/hooks/queries/hrms/leave/leave.hooks";
-import { LeaveRequest, LeaveBalance, LeaveType, LeaveStatus } from "@/hooks/queries/hrms/leave/leave.types";
+import { LeaveRequest, LeaveBalance, LeaveType, LeaveStatus, LeaveTypeOption } from "@/hooks/queries/hrms/leave/leave.types";
 import { Employee } from "@/hooks/queries/hrms/employees/employees.types";
 import { leaveApi } from "@/hooks/queries/hrms/leave/leave.api";
 import { DataTable, Column } from "@/components/shared/datatable";
+import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 export default function LeavePage() {
+  const [topTab, setTopTab] = React.useState<"requests" | "types">("requests");
   const [activeTab, setActiveTab] = React.useState<"my-requests" | "team-approvals" | "outages">("my-requests");
   
   // Search & Filter state
@@ -80,6 +93,27 @@ export default function LeavePage() {
   });
   const [leaveTypeSubmitting, setLeaveTypeSubmitting] = React.useState(false);
   const [leaveTypeError, setLeaveTypeError] = React.useState<string | null>(null);
+
+  // Edit Leave Type modal state
+  const [editingLeaveType, setEditingLeaveType] = React.useState<LeaveTypeOption | null>(null);
+  const [editLeaveTypeForm, setEditLeaveTypeForm] = React.useState({
+    name: "",
+    code: "",
+    maxDays: "",
+    description: "",
+    requiresApproval: true,
+  });
+  const [isEditLeaveTypeModalOpen, setIsEditLeaveTypeModalOpen] = React.useState(false);
+  const [editLeaveTypeError, setEditLeaveTypeError] = React.useState<string | null>(null);
+  const [editLeaveTypeSubmitting, setEditLeaveTypeSubmitting] = React.useState(false);
+
+  // Delete Leave Type confirmation state
+  const [leaveTypeToDelete, setLeaveTypeToDelete] = React.useState<string | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false);
+
+  // Mutations
+  const updateLeaveTypeMutation = useUpdateLeaveType();
+  const deleteLeaveTypeMutation = useDeleteLeaveType();
 
   // Leave Form values
   const [formValues, setFormValues] = React.useState({
@@ -108,7 +142,7 @@ export default function LeavePage() {
   const rejectMutation = useRejectLeave();
   const cancelMutation = useCancelLeave();
 
-  const { data: leaveTypes, isLoading: isLoadingLeaveTypes, isError: isLeaveTypesError } = useLeaveTypes();
+  const { data: leaveTypes, isLoading: isLoadingLeaveTypes, isError: isLeaveTypesError, refetch: refetchLeaveTypes } = useLeaveTypes();
 
   // Static departments mapping
   const departments = [
@@ -334,6 +368,7 @@ export default function LeavePage() {
       toast.success("Leave type created successfully!");
       setIsCreateLeaveTypeModalOpen(false);
       setLeaveTypeForm({ name: "", code: "", maxDays: "", description: "", requiresApproval: true });
+      refetchLeaveTypes();
     } catch (err) {
       setLeaveTypeError(err instanceof Error ? err.message : "Failed to create leave type. Please try again.");
     } finally {
@@ -341,10 +376,162 @@ export default function LeavePage() {
     }
   };
 
+  // Handle edit leave type submit
+  const handleEditLeaveType = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setEditLeaveTypeError(null);
+
+    if (!editLeaveTypeForm.name || !editLeaveTypeForm.code || !editLeaveTypeForm.maxDays || !editingLeaveType) {
+      setEditLeaveTypeError("Please fill in all required fields.");
+      return;
+    }
+
+    setEditLeaveTypeSubmitting(true);
+    try {
+      await updateLeaveTypeMutation.mutateAsync({
+        id: editingLeaveType._id,
+        data: {
+          name: editLeaveTypeForm.name,
+          code: editLeaveTypeForm.code.toUpperCase(),
+          maxDays: parseInt(editLeaveTypeForm.maxDays, 10),
+          description: editLeaveTypeForm.description || undefined,
+          requiresApproval: editLeaveTypeForm.requiresApproval,
+        },
+      });
+      toast.success("Leave type updated successfully!");
+      setIsEditLeaveTypeModalOpen(false);
+      setEditingLeaveType(null);
+      refetchLeaveTypes();
+    } catch (err) {
+      setEditLeaveTypeError(err instanceof Error ? err.message : "Failed to update leave type. Please try again.");
+    } finally {
+      setEditLeaveTypeSubmitting(false);
+    }
+  };
+
+  // Handle delete leave type
+  const handleDeleteLeaveType = React.useCallback((id: string) => {
+    setLeaveTypeToDelete(id);
+    setIsDeleteConfirmOpen(true);
+  }, []);
+
+  const confirmDeleteLeaveType = async () => {
+    if (!leaveTypeToDelete) return;
+    try {
+      await deleteLeaveTypeMutation.mutateAsync(leaveTypeToDelete);
+      toast.success("Leave type deleted successfully!");
+      refetchLeaveTypes();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to delete leave type. Please try again.");
+    } finally {
+      setIsDeleteConfirmOpen(false);
+      setLeaveTypeToDelete(null);
+    }
+  };
+
   // Calendar dates details showing away employees (Today or upcoming)
   const calendarEvents = React.useMemo(() => {
     return requestsList.filter((req) => req.status === "approved");
-  }, [requestsList]);  const myLeaveColumns = React.useMemo<Column<LeaveRequest>[]>(() => [
+  }, [requestsList]);  const leaveTypeColumns = React.useMemo<Column<any>[]>(() => [
+    {
+      header: "Leave Name",
+      cell: (lt) => (
+        <span className="font-semibold text-slate-800">
+          {lt.name}
+        </span>
+      ),
+      className: "px-6",
+    },
+    {
+      header: "Code",
+      cell: (lt) => (
+        <Badge className="bg-indigo-50 text-indigo-700 border-indigo-150 uppercase font-semibold text-[10px]">
+          {lt.code}
+        </Badge>
+      ),
+      className: "px-6",
+    },
+    {
+      header: "Max Days / Year",
+      cell: (lt) => (
+        <span className="font-bold text-slate-800">
+          {lt.maxDays || lt.daysPerYear || 0}
+        </span>
+      ),
+      className: "text-center px-6",
+    },
+    {
+      header: "Requires Approval",
+      cell: (lt) => (
+        lt.requiresApproval ? (
+          <Badge className="bg-amber-50 text-amber-700 border-amber-200 font-bold scale-90">Yes</Badge>
+        ) : (
+          <Badge className="bg-slate-50 text-slate-600 border-slate-200 font-medium scale-90">No</Badge>
+        )
+      ),
+      className: "text-center px-6",
+    },
+    {
+      header: "Description",
+      cell: (lt) => (
+        <span className="text-xs text-slate-500 max-w-[300px] truncate block">
+          {lt.description || "—"}
+        </span>
+      ),
+      className: "px-6",
+    },
+    {
+      header: "Status",
+      cell: (lt) => (
+        lt.isActive !== false ? (
+          <Badge className="bg-emerald-50 text-emerald-750 border-emerald-150 font-bold scale-90">Active</Badge>
+        ) : (
+          <Badge className="bg-rose-50 text-rose-750 border-rose-150 font-bold scale-90">Inactive</Badge>
+        )
+      ),
+    },
+    {
+      header: "Actions",
+      cell: (lt) => (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg">
+              <MoreHorizontal className="h-4 w-4 text-slate-500" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="bg-white border border-slate-200 shadow-md">
+            <DropdownMenuItem
+              onClick={() => {
+                setEditingLeaveType(lt);
+                setEditLeaveTypeForm({
+                  name: lt.name,
+                  code: lt.code,
+                  maxDays: String(lt.maxDays || lt.daysPerYear || ""),
+                  description: lt.description || "",
+                  requiresApproval: lt.requiresApproval !== false,
+                });
+                setIsEditLeaveTypeModalOpen(true);
+              }}
+              className="cursor-pointer flex items-center"
+            >
+              <Edit2 className="mr-2 h-4 w-4 text-slate-500" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleDeleteLeaveType(lt._id || lt.id)}
+              className="text-rose-600 focus:text-rose-600 focus:bg-rose-50 cursor-pointer flex items-center"
+            >
+              <Trash2 className="mr-2 h-4 w-4 text-rose-500" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ),
+      className: "text-right px-6",
+    },
+  ], [handleDeleteLeaveType, setEditingLeaveType, setEditLeaveTypeForm, setIsEditLeaveTypeModalOpen]);
+
+  const myLeaveColumns = React.useMemo<Column<LeaveRequest>[]>(() => [
     {
       header: "Leave Type",
       cell: (req) => (
@@ -542,8 +729,43 @@ export default function LeavePage() {
         </div>
       </div>
 
-      {/* Leave Balances Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Top Tabbar */}
+      <div className="flex border-b border-slate-200 gap-2 mb-2">
+        <Button
+          variant="ghost"
+          onClick={() => setTopTab("requests")}
+          className={cn(
+            "rounded-none border-b-2 pb-3 px-4 font-semibold text-sm transition-all -mb-[1px] flex items-center gap-2 h-auto hover:bg-transparent hover:text-indigo-600 bg-transparent text-slate-500 shadow-none border-t-0 border-x-0",
+            topTab === "requests"
+              ? "border-indigo-600 text-indigo-600 font-bold"
+              : "border-transparent hover:border-slate-300"
+          )}
+        >
+          <FileText className="h-4 w-4 shrink-0" />
+          Leave Requests
+        </Button>
+        <Button
+          variant="ghost"
+          onClick={() => {
+            setTopTab("types");
+            refetchLeaveTypes();
+          }}
+          className={cn(
+            "rounded-none border-b-2 pb-3 px-4 font-semibold text-sm transition-all -mb-[1px] flex items-center gap-2 h-auto hover:bg-transparent hover:text-indigo-600 bg-transparent text-slate-500 shadow-none border-t-0 border-x-0",
+            topTab === "types"
+              ? "border-indigo-600 text-indigo-600 font-bold"
+              : "border-transparent hover:border-slate-300"
+          )}
+        >
+          <Calendar className="h-4 w-4 shrink-0" />
+          Leave Types
+        </Button>
+      </div>
+
+      {topTab === "requests" ? (
+        <>
+          {/* Leave Balances Grid */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {balancesList.map((bal) => {
           let colorClass = "bg-indigo-50/50 text-indigo-700 border-indigo-100";
           let progressColor = "bg-indigo-600";
@@ -795,7 +1017,28 @@ export default function LeavePage() {
               </CardContent>
             </Card>
           )}
-      </div>
+          </div>
+        </>
+      ) : (
+        <Card className="border-slate-200 bg-white shadow-xs">
+          <CardHeader className="pb-3 border-b border-slate-100 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-sm font-bold text-slate-800">Leave Categories</CardTitle>
+              <CardDescription className="text-xs">
+                Active leave types and their yearly allocations.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <DataTable
+              data={leaveTypes || []}
+              columns={leaveTypeColumns}
+              isLoading={isLoadingLeaveTypes}
+              emptyMessage="No leave types found. Create one using the button above."
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Leave Request Dialog Form */}
       <Dialog open={isRequestOpen} onOpenChange={(open) => {
@@ -1125,6 +1368,151 @@ export default function LeavePage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Leave Type Dialog */}
+      <Dialog
+        open={isEditLeaveTypeModalOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setIsEditLeaveTypeModalOpen(false);
+            setEditingLeaveType(null);
+            setEditLeaveTypeForm({ name: "", code: "", maxDays: "", description: "", requiresApproval: true });
+            setEditLeaveTypeError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md bg-white border border-slate-200 rounded-xl p-6">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-slate-900">
+              Edit Leave Type
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-400">
+              Modify the configuration of the selected leave type.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleEditLeaveType} className="space-y-4 py-2">
+            {editLeaveTypeError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs font-semibold text-rose-700">
+                {editLeaveTypeError}
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Leave Type Name *</label>
+              <Input
+                type="text"
+                placeholder="e.g. Bereavement Leave"
+                value={editLeaveTypeForm.name}
+                onChange={(e) => setEditLeaveTypeForm({ ...editLeaveTypeForm, name: e.target.value })}
+                required
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600">Leave Code *</label>
+                <Input
+                  type="text"
+                  placeholder="e.g. BRV"
+                  value={editLeaveTypeForm.code}
+                  onChange={(e) => setEditLeaveTypeForm({ ...editLeaveTypeForm, code: e.target.value.toUpperCase() })}
+                  required
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-600">Max Days / Year *</label>
+                <Input
+                  type="number"
+                  min={1}
+                  placeholder="e.g. 5"
+                  value={editLeaveTypeForm.maxDays}
+                  onChange={(e) => setEditLeaveTypeForm({ ...editLeaveTypeForm, maxDays: e.target.value })}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-slate-600">Description</label>
+              <Textarea
+                placeholder="Optional description for this leave type..."
+                value={editLeaveTypeForm.description}
+                onChange={(e) => setEditLeaveTypeForm({ ...editLeaveTypeForm, description: e.target.value })}
+                className="h-20"
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <div>
+                <label className="text-xs font-semibold text-slate-700">Requires Approval</label>
+                <p className="text-[11px] text-slate-400 mt-0.5">Manager must approve requests for this type</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditLeaveTypeForm({ ...editLeaveTypeForm, requiresApproval: !editLeaveTypeForm.requiresApproval })}
+                className={cn(
+                  "relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden",
+                  editLeaveTypeForm.requiresApproval ? "bg-indigo-600" : "bg-slate-200"
+                )}
+              >
+                <span
+                  className={cn(
+                    "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out",
+                    editLeaveTypeForm.requiresApproval ? "translate-x-5" : "translate-x-0"
+                  )}
+                />
+              </button>
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setIsEditLeaveTypeModalOpen(false);
+                  setEditingLeaveType(null);
+                  setEditLeaveTypeForm({ name: "", code: "", maxDays: "", description: "", requiresApproval: true });
+                  setEditLeaveTypeError(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                size="sm"
+                disabled={editLeaveTypeSubmitting}
+                className="bg-indigo-600 text-white hover:bg-indigo-700 font-semibold disabled:opacity-50"
+              >
+                {editLeaveTypeSubmitting ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Saving...
+                  </span>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Leave Type Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={isDeleteConfirmOpen}
+        title="Delete Leave Type"
+        description="Are you sure you want to delete this leave type? This action cannot be undone."
+        onConfirm={confirmDeleteLeaveType}
+        onCancel={() => {
+          setIsDeleteConfirmOpen(false);
+          setLeaveTypeToDelete(null);
+        }}
+      />
 
     </div>
   );

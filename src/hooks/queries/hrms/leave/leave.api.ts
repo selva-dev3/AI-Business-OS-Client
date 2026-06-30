@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiPatch } from "@/hooks/queries/client";
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete } from "@/hooks/queries/client";
 import { buildQueryString } from "@/hooks/queries/utils";
 import {
   LeaveRequest,
@@ -6,9 +6,12 @@ import {
   LeaveBalance,
   LeaveCalendarEvent,
   LeaveTypeOption,
+  LeaveTypeDetail,
   LeaveSearchParams,
   CreateLeaveRequestData,
   CreateLeaveTypeData,
+  UpdateLeaveTypeData,
+  UpdateLeaveRequestData,
   ApproveRejectRequestData,
 } from "./leave.types";
 import { Employee, EmployeeListResponse } from "@/hooks/queries/hrms/employees/employees.types";
@@ -96,11 +99,20 @@ export const leaveApi = {
   getLeaveTypes: () =>
     apiGet<LeaveTypeOption[]>(BASE_LEAVE_TYPES),
 
+  getLeaveType: (id: string) =>
+    apiGet<LeaveTypeDetail>(`${BASE_LEAVE_TYPES}/${id}`),
+
   getEmployees: () =>
     apiGet<EmployeeListResponse>("/hrms/employees"),
 
   createLeaveType: (data: CreateLeaveTypeData) =>
     apiPost<LeaveTypeOption>(BASE_LEAVE_TYPES, data),
+
+  updateLeaveType: (id: string, data: UpdateLeaveTypeData) =>
+    apiPatch<LeaveTypeDetail>(`${BASE_LEAVE_TYPES}/${id}`, data),
+
+  deleteLeaveType: (id: string) =>
+    apiDelete<{ message: string }>(`${BASE_LEAVE_TYPES}/${id}`),
 
   getAll: async (params?: LeaveSearchParams): Promise<LeaveListResponse> => {
     const serverParams = buildServerParams(params);
@@ -122,8 +134,17 @@ export const leaveApi = {
   getCalendar: (params?: { start?: string; end?: string; departmentId?: string }) =>
     apiGet<LeaveCalendarEvent[]>(`${BASE_CALENDAR}${buildQueryString(params ?? {})}`),
 
+  getLeaveRequest: (id: string) =>
+    apiGet<LeaveRequest>(`${BASE_REQUESTS}/${id}`),
+
   create: (data: CreateLeaveRequestData) =>
     apiPost<LeaveRequest>(BASE_REQUESTS, data),
+
+  updateLeaveRequest: (id: string, data: UpdateLeaveRequestData) =>
+    apiPatch<LeaveRequest>(`${BASE_REQUESTS}/${id}`, data),
+
+  deleteLeaveRequest: (id: string) =>
+    apiDelete<{ message: string }>(`${BASE_REQUESTS}/${id}`),
 
   approve: (id: string, data?: ApproveRejectRequestData) =>
     apiPost<LeaveRequest>(`${BASE_REQUESTS}/${id}/approve`, data),

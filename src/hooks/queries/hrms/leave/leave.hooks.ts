@@ -4,14 +4,58 @@ import { leaveKeys } from "./leave.keys";
 import {
   LeaveSearchParams,
   CreateLeaveRequestData,
+  CreateLeaveTypeData,
+  UpdateLeaveTypeData,
+  UpdateLeaveRequestData,
   ApproveRejectRequestData,
 } from "./leave.types";
 
-export function useLeaveTypes() {
+export function useLeaveTypes(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: leaveKeys.leaveTypes(),
     queryFn: () => leaveApi.getLeaveTypes(),
     staleTime: 5 * 60 * 1000,
+    ...options,
+  });
+}
+
+export function useLeaveType(id: string) {
+  return useQuery({
+    queryKey: leaveKeys.leaveType(id),
+    queryFn: () => leaveApi.getLeaveType(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateLeaveType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateLeaveTypeData) => leaveApi.createLeaveType(data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: leaveKeys.leaveTypes() });
+    },
+  });
+}
+
+export function useUpdateLeaveType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateLeaveTypeData }) =>
+      leaveApi.updateLeaveType(id, data),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: leaveKeys.leaveTypes() });
+      qc.invalidateQueries({ queryKey: leaveKeys.leaveType(id) });
+    },
+  });
+}
+
+export function useDeleteLeaveType() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => leaveApi.deleteLeaveType(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: leaveKeys.leaveTypes() });
+    },
   });
 }
 
@@ -62,6 +106,36 @@ export function useRejectLeave() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data?: ApproveRejectRequestData }) =>
       leaveApi.reject(id, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: leaveKeys.all });
+    },
+  });
+}
+
+export function useLeaveRequest(id: string) {
+  return useQuery({
+    queryKey: leaveKeys.leaveRequest(id),
+    queryFn: () => leaveApi.getLeaveRequest(id),
+    enabled: !!id,
+  });
+}
+
+export function useUpdateLeaveRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateLeaveRequestData }) =>
+      leaveApi.updateLeaveRequest(id, data),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: leaveKeys.all });
+      qc.invalidateQueries({ queryKey: leaveKeys.leaveRequest(id) });
+    },
+  });
+}
+
+export function useDeleteLeaveRequest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => leaveApi.deleteLeaveRequest(id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: leaveKeys.all });
     },
