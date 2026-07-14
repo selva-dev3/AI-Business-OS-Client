@@ -1,25 +1,46 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import {
   Users,
   Clock,
   CalendarOff,
   DollarSign,
-  Building2,
-  Laptop,
-  TrendingUp,
-  TrendingDown,
+  Plus,
+  Download,
   ArrowUpRight,
   ArrowDownRight,
-  MoreHorizontal,
-  Plus,
-  Search,
-  Filter,
-  Download,
   RefreshCw,
+  Calendar,
+  AlertCircle,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useHRMSDashboard } from "@/hooks/queries/hrms/dashboard/dashboard.hooks";
+import { useDashboardActivity } from "@/hooks/queries/dashboard/dashboard.hooks";
+import { DashboardActivity } from "@/hooks/queries/dashboard/dashboard.api";
+
+const DEPARTMENT_COLORS = [
+  "bg-indigo-500",
+  "bg-emerald-500",
+  "bg-blue-500",
+  "bg-amber-500",
+  "bg-purple-500",
+  "bg-rose-500",
+  "bg-cyan-500",
+  "bg-pink-500",
+];
+
+function getInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+}
 
 /* ------------------------------------------------------------------ */
 /*  Stat Card                                                          */
@@ -27,8 +48,8 @@ import { cn } from "@/lib/utils";
 interface StatCardProps {
   title: string;
   value: string;
-  change: string;
-  trend: "up" | "down";
+  change?: string;
+  trend?: "up" | "down";
   icon: React.ElementType;
   iconColor: string;
   iconBg: string;
@@ -41,22 +62,24 @@ function StatCard({ title, value, change, trend, icon: Icon, iconColor, iconBg }
         <div className="flex-1">
           <p className="text-sm font-medium text-slate-500">{title}</p>
           <p className="text-2xl font-bold text-slate-900 mt-1">{value}</p>
-          <div className="flex items-center gap-1 mt-2">
-            {trend === "up" ? (
-              <ArrowUpRight className="h-4 w-4 text-emerald-500" />
-            ) : (
-              <ArrowDownRight className="h-4 w-4 text-red-500" />
-            )}
-            <span
-              className={cn(
-                "text-sm font-medium",
-                trend === "up" ? "text-emerald-600" : "text-red-600"
+          {change && trend ? (
+            <div className="flex items-center gap-1 mt-2">
+              {trend === "up" ? (
+                <ArrowUpRight className="h-4 w-4 text-emerald-500" />
+              ) : (
+                <ArrowDownRight className="h-4 w-4 text-red-500" />
               )}
-            >
-              {change}
-            </span>
-            <span className="text-sm text-slate-400">vs last month</span>
-          </div>
+              <span
+                className={cn(
+                  "text-sm font-medium",
+                  trend === "up" ? "text-emerald-600" : "text-red-600"
+                )}
+              >
+                {change}
+              </span>
+              <span className="text-sm text-slate-400">vs last month</span>
+            </div>
+          ) : null}
         </div>
         <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center", iconBg)}>
           <Icon className={cn("h-5 w-5", iconColor)} />
@@ -67,55 +90,18 @@ function StatCard({ title, value, change, trend, icon: Icon, iconColor, iconBg }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Recent Activity Item                                               */
+/*  Skeleton Card                                                      */
 /* ------------------------------------------------------------------ */
-interface ActivityItem {
-  name: string;
-  action: string;
-  time: string;
-  avatar: string;
-}
-
-function ActivityItem({ name, action, time, avatar }: ActivityItem) {
+function StatCardSkeleton() {
   return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
-      <div className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-sm font-semibold shrink-0">
-        {avatar}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-slate-700">
-          <span className="font-medium text-slate-900">{name}</span> {action}
-        </p>
-        <p className="text-xs text-slate-400 mt-0.5">{time}</p>
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Upcoming Event Item                                                */
-/* ------------------------------------------------------------------ */
-interface EventItem {
-  title: string;
-  date: string;
-  type: "holiday" | "meeting" | "deadline";
-}
-
-function EventItem({ title, date, type }: EventItem) {
-  const typeColors = {
-    holiday: "bg-emerald-100 text-emerald-700",
-    meeting: "bg-blue-100 text-blue-700",
-    deadline: "bg-amber-100 text-amber-700",
-  };
-
-  return (
-    <div className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
-      <div className={cn("px-2 py-1 rounded text-xs font-medium", typeColors[type])}>
-        {type.charAt(0).toUpperCase() + type.slice(1)}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-slate-700 truncate">{title}</p>
-        <p className="text-xs text-slate-400">{date}</p>
+    <div className="bg-white rounded-xl border border-slate-200 p-5 animate-pulse">
+      <div className="flex items-start justify-between">
+        <div className="flex-1 space-y-3">
+          <div className="h-3 bg-slate-200 rounded w-24" />
+          <div className="h-7 bg-slate-200 rounded w-16" />
+          <div className="h-3 bg-slate-200 rounded w-28" />
+        </div>
+        <div className="h-10 w-10 rounded-lg bg-slate-200" />
       </div>
     </div>
   );
@@ -148,72 +134,132 @@ function DepartmentBar({ name, count, percentage, color }: DepartmentData) {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  Activity Item                                                      */
+/* ------------------------------------------------------------------ */
+function ActivityItem({ activity }: { activity: DashboardActivity }) {
+  const actorName = activity.user?.name || "System";
+  const initials = getInitials(actorName);
+  const timeAgo = formatTimeAgo(activity.timestamp);
+
+  return (
+    <div className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0">
+      <div className="h-9 w-9 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 text-sm font-semibold shrink-0">
+        {initials}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-slate-700">
+          <span className="font-medium text-slate-900">{actorName}</span>{" "}
+          {activity.description || activity.action}
+        </p>
+        <p className="text-xs text-slate-400 mt-0.5">{timeAgo}</p>
+      </div>
+    </div>
+  );
+}
+
+function formatTimeAgo(timestamp: string): string {
+  const now = Date.now();
+  const then = new Date(timestamp).getTime();
+  const diffMs = now - then;
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 60) return "just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin} min ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr} hour${diffHr > 1 ? "s" : ""} ago`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay} day${diffDay > 1 ? "s" : ""} ago`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Loading / Error / Empty helpers                                    */
+/* ------------------------------------------------------------------ */
+function SectionError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 text-center">
+      <AlertCircle className="h-8 w-8 text-red-400 mb-2" />
+      <p className="text-sm text-slate-500 mb-3">{message}</p>
+      <button
+        onClick={onRetry}
+        className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+      >
+        <RefreshCw className="h-3.5 w-3.5" />
+        Retry
+      </button>
+    </div>
+  );
+}
+
+function SectionEmpty({ icon: Icon, title, description }: { icon?: React.ElementType; title: string; description: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-8 text-center">
+      {Icon && <Icon className="h-8 w-8 text-slate-300 mb-2" />}
+      <p className="text-sm font-medium text-slate-400">{title}</p>
+      <p className="text-xs text-slate-400 mt-1">{description}</p>
+    </div>
+  );
+}
+
+function SkeletonLine({ className }: { className?: string }) {
+  return <div className={cn("h-3 bg-slate-200 rounded animate-pulse", className)} />;
+}
+
+function SkeletonBar() {
+  return (
+    <div className="space-y-1.5 animate-pulse">
+      <div className="flex items-center justify-between">
+        <SkeletonLine className="w-24" />
+        <SkeletonLine className="w-20" />
+      </div>
+      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-full bg-slate-200 rounded-full" style={{ width: "60%" }} />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonActivityItem() {
+  return (
+    <div className="flex items-center gap-3 py-3 border-b border-slate-100 last:border-0 animate-pulse">
+      <div className="h-9 w-9 rounded-full bg-slate-200 shrink-0" />
+      <div className="flex-1 space-y-2">
+        <div className="h-3 bg-slate-200 rounded w-3/4" />
+        <div className="h-2 bg-slate-200 rounded w-1/4" />
+      </div>
+    </div>
+  );
+}
+
 /* ================================================================== */
 /*  HRMS Dashboard Page                                                */
 /* ================================================================== */
 export default function HRMSPage() {
-  const stats: StatCardProps[] = [
-    {
-      title: "Total Employees",
-      value: "1,248",
-      change: "+12.5%",
-      trend: "up",
-      icon: Users,
-      iconColor: "text-indigo-600",
-      iconBg: "bg-indigo-100",
-    },
-    {
-      title: "Present Today",
-      value: "1,089",
-      change: "+3.2%",
-      trend: "up",
-      icon: Clock,
-      iconColor: "text-emerald-600",
-      iconBg: "bg-emerald-100",
-    },
-    {
-      title: "On Leave",
-      value: "87",
-      change: "-8.1%",
-      trend: "down",
-      icon: CalendarOff,
-      iconColor: "text-amber-600",
-      iconBg: "bg-amber-100",
-    },
-    {
-      title: "Payroll This Month",
-      value: "$2.4M",
-      change: "+5.7%",
-      trend: "up",
-      icon: DollarSign,
-      iconColor: "text-blue-600",
-      iconBg: "bg-blue-100",
-    },
-  ];
+  const { data, isLoading, isError, refetch } = useHRMSDashboard();
+  const {
+    data: activityData,
+    isLoading: isActivityLoading,
+    isError: isActivityError,
+    refetch: refetchActivity,
+  } = useDashboardActivity({ limit: 5, module: "HRMS" });
 
-  const departments: DepartmentData[] = [
-    { name: "Engineering", count: 324, percentage: 85, color: "bg-indigo-500" },
-    { name: "Marketing", count: 186, percentage: 65, color: "bg-emerald-500" },
-    { name: "Sales", count: 156, percentage: 55, color: "bg-blue-500" },
-    { name: "Human Resources", count: 89, percentage: 35, color: "bg-amber-500" },
-    { name: "Finance", count: 78, percentage: 30, color: "bg-purple-500" },
-    { name: "Operations", count: 67, percentage: 25, color: "bg-rose-500" },
-  ];
+  const todayStr = React.useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }, []);
 
-  const recentActivities: ActivityItem[] = [
-    { name: "John Smith", action: "checked in at 9:02 AM", time: "2 minutes ago", avatar: "JS" },
-    { name: "Sarah Wilson", action: "submitted a leave request", time: "15 minutes ago", avatar: "SW" },
-    { name: "Mike Johnson", action: "updated their profile", time: "1 hour ago", avatar: "MJ" },
-    { name: "Emily Davis", action: "completed onboarding", time: "2 hours ago", avatar: "ED" },
-    { name: "Alex Brown", action: "requested overtime approval", time: "3 hours ago", avatar: "AB" },
-  ];
-
-  const upcomingEvents: EventItem[] = [
-    { title: "Company Holiday - Independence Day", date: "Jul 4, 2026", type: "holiday" },
-    { title: "Team Standup Meeting", date: "Today, 10:00 AM", type: "meeting" },
-    { title: "Q2 Performance Reviews Due", date: "Jun 30, 2026", type: "deadline" },
-    { title: "Monthly Town Hall", date: "Jul 1, 2026", type: "meeting" },
-  ];
+  const attendanceBreakdown = React.useMemo(() => {
+    if (!data) return null;
+    const todayAttendance = data.weeklyAttendance?.[todayStr] || {};
+    const present = data.presentToday;
+    const onLeave = data.onLeaveToday;
+    const absent = todayAttendance["ABSENT"] || 0;
+    const late = todayAttendance["LATE"] || 0;
+    const total = present + absent + onLeave;
+    const attendanceRate = total > 0 ? ((present / total) * 100).toFixed(1) : "0";
+    const lateRate = total > 0 ? ((late / total) * 100).toFixed(1) : "0";
+    return { present, onLeave, absent, late, attendanceRate, lateRate };
+  }, [data, todayStr]);
 
   const quickActions = [
     { label: "Add Employee", icon: Plus, href: "/hrms/employees/new" },
@@ -229,7 +275,7 @@ export default function HRMSPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">HRMS Dashboard</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Welcome back! Here's what's happening with your workforce.
+            Welcome back! Here&apos;s what&apos;s happening with your workforce.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -237,18 +283,61 @@ export default function HRMSPage() {
             <Download className="h-4 w-4" />
             Export
           </button>
-          <button className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors">
+          <Link
+            href="/hrms/employees/new"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
+          >
             <Plus className="h-4 w-4" />
             Add Employee
-          </button>
+          </Link>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <StatCard key={stat.title} {...stat} />
-        ))}
+        {isLoading ? (
+          <>
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+            <StatCardSkeleton />
+          </>
+        ) : isError ? (
+          <div className="lg:col-span-4">
+            <SectionError message="Failed to load dashboard statistics" onRetry={() => refetch()} />
+          </div>
+        ) : (
+          <>
+            <StatCard
+              title="Total Employees"
+              value={(data?.totalEmployees ?? 0).toLocaleString("en-US")}
+              icon={Users}
+              iconColor="text-indigo-600"
+              iconBg="bg-indigo-100"
+            />
+            <StatCard
+              title="Present Today"
+              value={(data?.presentToday ?? 0).toLocaleString("en-US")}
+              icon={Clock}
+              iconColor="text-emerald-600"
+              iconBg="bg-emerald-100"
+            />
+            <StatCard
+              title="On Leave"
+              value={(data?.onLeaveToday ?? 0).toLocaleString("en-US")}
+              icon={CalendarOff}
+              iconColor="text-amber-600"
+              iconBg="bg-amber-100"
+            />
+            <StatCard
+              title="Payroll This Month"
+              value="—"
+              icon={DollarSign}
+              iconColor="text-blue-600"
+              iconBg="bg-blue-100"
+            />
+          </>
+        )}
       </div>
 
       {/* Quick Actions */}
@@ -256,8 +345,9 @@ export default function HRMSPage() {
         <h2 className="text-sm font-semibold text-slate-900 mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {quickActions.map((action) => (
-            <button
+            <Link
               key={action.label}
+              href={action.href}
               className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg hover:bg-indigo-50 hover:text-indigo-700 transition-colors text-left group"
             >
               <div className="h-9 w-9 rounded-lg bg-white border border-slate-200 flex items-center justify-center group-hover:border-indigo-200 group-hover:bg-indigo-100 transition-colors">
@@ -266,7 +356,7 @@ export default function HRMSPage() {
               <span className="text-sm font-medium text-slate-700 group-hover:text-indigo-700">
                 {action.label}
               </span>
-            </button>
+            </Link>
           ))}
         </div>
       </div>
@@ -277,30 +367,65 @@ export default function HRMSPage() {
         <div className="lg:col-span-2 bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-5">
             <h2 className="text-sm font-semibold text-slate-900">Department Distribution</h2>
-            <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+            <Link
+              href="/hrms/departments"
+              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+            >
               View All
-            </button>
+            </Link>
           </div>
-          <div className="space-y-4">
-            {departments.map((dept) => (
-              <DepartmentBar key={dept.name} {...dept} />
-            ))}
-          </div>
+          {isLoading ? (
+            <div className="space-y-4">
+              <SkeletonBar />
+              <SkeletonBar />
+              <SkeletonBar />
+              <SkeletonBar />
+              <SkeletonBar />
+              <SkeletonBar />
+            </div>
+          ) : isError ? (
+            <SectionError message="Failed to load department data" onRetry={() => refetch()} />
+          ) : !data?.departmentWise?.length ? (
+            <SectionEmpty
+              icon={Building2}
+              title="No departments found"
+              description="Department data will appear here once employees are assigned."
+            />
+          ) : (
+            <div className="space-y-4">
+              {(() => {
+                const depts = data.departmentWise;
+                const maxCount = Math.max(...depts.map((d) => d.count), 1);
+                return depts.map((dept, i) => (
+                  <DepartmentBar
+                    key={dept.department}
+                    name={dept.department}
+                    count={dept.count}
+                    percentage={(dept.count / maxCount) * 100}
+                    color={DEPARTMENT_COLORS[i % DEPARTMENT_COLORS.length]}
+                  />
+                ));
+              })()}
+            </div>
+          )}
         </div>
 
         {/* Upcoming Events */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-slate-900">Upcoming Events</h2>
-            <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+            <Link
+              href="/hrms/holidays"
+              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+            >
               View All
-            </button>
+            </Link>
           </div>
-          <div className="space-y-0">
-            {upcomingEvents.map((event, index) => (
-              <EventItem key={index} {...event} />
-            ))}
-          </div>
+          <SectionEmpty
+            icon={Calendar}
+            title="No upcoming events"
+            description="Events data is not yet available from this endpoint."
+          />
         </div>
       </div>
 
@@ -310,57 +435,118 @@ export default function HRMSPage() {
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-slate-900">Recent Activity</h2>
-            <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+            <Link
+              href="/hrms/reports"
+              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+            >
               View All
-            </button>
+            </Link>
           </div>
-          <div className="space-y-0">
-            {recentActivities.map((activity, index) => (
-              <ActivityItem key={index} {...activity} />
-            ))}
-          </div>
+          {isActivityLoading ? (
+            <div className="space-y-0">
+              <SkeletonActivityItem />
+              <SkeletonActivityItem />
+              <SkeletonActivityItem />
+              <SkeletonActivityItem />
+              <SkeletonActivityItem />
+            </div>
+          ) : isActivityError ? (
+            <SectionError message="Failed to load recent activity" onRetry={() => refetchActivity()} />
+          ) : !activityData?.activities?.length ? (
+            <SectionEmpty
+              icon={AlertCircle}
+              title="No recent activity"
+              description="HRMS activity will appear here as it happens."
+            />
+          ) : (
+            <div className="space-y-0">
+              {activityData.activities.map((act, idx) => (
+                <ActivityItem key={act.timestamp + idx} activity={act} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Attendance Overview */}
         <div className="bg-white rounded-xl border border-slate-200 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-slate-900">Today's Attendance</h2>
-            <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+            <h2 className="text-sm font-semibold text-slate-900">Today&apos;s Attendance</h2>
+            <Link
+              href="/hrms/attendance"
+              className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+            >
               Details
-            </button>
+            </Link>
           </div>
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="text-center p-4 bg-emerald-50 rounded-lg">
-              <p className="text-2xl font-bold text-emerald-600">1,089</p>
-              <p className="text-xs text-emerald-600 font-medium mt-1">Present</p>
+          {isLoading ? (
+            <div className="animate-pulse space-y-4">
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="text-center p-4 bg-slate-100 rounded-lg">
+                    <div className="h-7 bg-slate-200 rounded w-12 mx-auto mb-1" />
+                    <div className="h-3 bg-slate-200 rounded w-14 mx-auto" />
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-3">
+                <div className="h-3 bg-slate-200 rounded w-full" />
+                <div className="h-3 bg-slate-200 rounded w-full" />
+              </div>
             </div>
-            <div className="text-center p-4 bg-amber-50 rounded-lg">
-              <p className="text-2xl font-bold text-amber-600">87</p>
-              <p className="text-xs text-amber-600 font-medium mt-1">On Leave</p>
-            </div>
-            <div className="text-center p-4 bg-red-50 rounded-lg">
-              <p className="text-2xl font-bold text-red-600">72</p>
-              <p className="text-xs text-red-600 font-medium mt-1">Absent</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-600">Attendance Rate</span>
-              <span className="font-semibold text-slate-900">87.3%</span>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500 rounded-full" style={{ width: "87.3%" }} />
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-slate-600">Late Arrivals</span>
-              <span className="font-semibold text-slate-900">42</span>
-            </div>
-            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-amber-500 rounded-full" style={{ width: "3.8%" }} />
-            </div>
-          </div>
+          ) : isError ? (
+            <SectionError message="Failed to load attendance data" onRetry={() => refetch()} />
+          ) : attendanceBreakdown ? (
+            <>
+              <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="text-center p-4 bg-emerald-50 rounded-lg">
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {attendanceBreakdown.present.toLocaleString("en-US")}
+                  </p>
+                  <p className="text-xs text-emerald-600 font-medium mt-1">Present</p>
+                </div>
+                <div className="text-center p-4 bg-amber-50 rounded-lg">
+                  <p className="text-2xl font-bold text-amber-600">
+                    {attendanceBreakdown.onLeave.toLocaleString("en-US")}
+                  </p>
+                  <p className="text-xs text-amber-600 font-medium mt-1">On Leave</p>
+                </div>
+                <div className="text-center p-4 bg-red-50 rounded-lg">
+                  <p className="text-2xl font-bold text-red-600">
+                    {attendanceBreakdown.absent.toLocaleString("en-US")}
+                  </p>
+                  <p className="text-xs text-red-600 font-medium mt-1">Absent</p>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-600">Attendance Rate</span>
+                  <span className="font-semibold text-slate-900">{attendanceBreakdown.attendanceRate}%</span>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 rounded-full"
+                    style={{ width: `${attendanceBreakdown.attendanceRate}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-600">Late Arrivals</span>
+                  <span className="font-semibold text-slate-900">
+                    {attendanceBreakdown.late.toLocaleString("en-US")}
+                  </span>
+                </div>
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-500 rounded-full"
+                    style={{ width: `${attendanceBreakdown.lateRate}%` }}
+                  />
+                </div>
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
     </div>
   );
 }
+
+

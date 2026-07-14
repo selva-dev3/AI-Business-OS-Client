@@ -11,6 +11,7 @@ export const endpoints = {
     dashboard: "/dashboard",
   },
   hrms: {
+    dashboard: "/hrms/dashboard",
     employees: "/hrms/employees",
     departments: "/hrms/departments",
     attendance: "/hrms/attendance",
