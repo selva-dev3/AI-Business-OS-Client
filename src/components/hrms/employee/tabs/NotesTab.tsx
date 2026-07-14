@@ -50,11 +50,19 @@ import { cn } from "@/lib/utils";
 import { EmployeeNoteItem } from "@/types/hrms";
 import { toast } from "sonner";
 
-const CATEGORIES = ["GENERAL", "PERFORMANCE", "DISCIPLINARY", "TRAINING", "APPRAISAL", "OTHER"];
+const CATEGORIES = ["PERFORMANCE", "DISCIPLINARY", "GENERAL", "APPRECIATION", "COMPLAINT", "OTHER"] as const;
+const CATEGORY_LABELS: Record<string, string> = {
+  PERFORMANCE: "Performance",
+  DISCIPLINARY: "Disciplinary",
+  GENERAL: "General",
+  APPRECIATION: "Appreciation",
+  COMPLAINT: "Complaint",
+  OTHER: "Other",
+};
 const VISIBILITY_OPTIONS = [
-  { value: "hr_only", label: "HR Only" },
-  { value: "admin_only", label: "Admin Only" },
-  { value: "hr_and_admin", label: "HR & Admin" },
+  { value: "HR_ONLY", label: "HR Only" },
+  { value: "ADMIN_ONLY", label: "Admin Only" },
+  { value: "HR_AND_ADMIN", label: "HR & Admin" },
 ];
 
 export default function NotesTab({ employeeId }: { employeeId: string }) {
@@ -77,12 +85,12 @@ export default function NotesTab({ employeeId }: { employeeId: string }) {
 
   // Form state
   const [content, setContent] = React.useState("");
-  const [category, setCategory] = React.useState("General");
-  const [visibility, setVisibility] = React.useState("hr_and_admin");
+  const [category, setCategory] = React.useState("GENERAL");
+  const [visibility, setVisibility] = React.useState("HR_AND_ADMIN");
   const [isPinned, setIsPinned] = React.useState(false);
 
   const resetForm = () => {
-    setContent(""); setCategory("General"); setVisibility("hr_and_admin"); setIsPinned(false);
+    setContent(""); setCategory("GENERAL"); setVisibility("HR_AND_ADMIN"); setIsPinned(false);
   };
 
   const openCreate = () => {
@@ -172,7 +180,7 @@ export default function NotesTab({ employeeId }: { employeeId: string }) {
           <SelectContent>
             <SelectItem value="all">All Categories</SelectItem>
             {CATEGORIES.map((c) => (
-              <SelectItem key={c} value={c}>{c}</SelectItem>
+              <SelectItem key={c} value={c}>{CATEGORY_LABELS[c] ?? c}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -233,7 +241,7 @@ export default function NotesTab({ employeeId }: { employeeId: string }) {
                   </SelectTrigger>
                   <SelectContent>
                     {CATEGORIES.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                      <SelectItem key={c} value={c}>{CATEGORY_LABELS[c] ?? c}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -299,14 +307,14 @@ function NoteCard({
   onDelete: () => void;
 }) {
   const visColors: Record<string, string> = {
-    hr_only: "bg-purple-100 text-purple-700",
-    admin_only: "bg-rose-100 text-rose-700",
-    hr_and_admin: "bg-blue-100 text-blue-700",
+    HR_ONLY: "bg-purple-100 text-purple-700",
+    ADMIN_ONLY: "bg-rose-100 text-rose-700",
+    HR_AND_ADMIN: "bg-blue-100 text-blue-700",
   };
   const visLabels: Record<string, string> = {
-    hr_only: "HR Only",
-    admin_only: "Admin Only",
-    hr_and_admin: "HR & Admin",
+    HR_ONLY: "HR Only",
+    ADMIN_ONLY: "Admin Only",
+    HR_AND_ADMIN: "HR & Admin",
   };
 
   return (
@@ -316,7 +324,7 @@ function NoteCard({
           <div className="flex-1 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
               {note.isPinned && <Pin className="h-3.5 w-3.5 text-amber-500" />}
-              <Badge variant="outline" className="text-[10px]">{note.category}</Badge>
+              <Badge variant="outline" className="text-[10px]">{CATEGORY_LABELS[note.category] ?? note.category}</Badge>
               <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold", visColors[note.visibility] || "bg-slate-100 text-slate-600")}>
                 {visLabels[note.visibility] || note.visibility}
               </span>

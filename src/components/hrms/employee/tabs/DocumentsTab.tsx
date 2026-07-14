@@ -47,7 +47,17 @@ import { cn } from "@/lib/utils";
 import { EmployeeDocumentItem } from "@/types/hrms";
 import { toast } from "sonner";
 
-const DOC_TYPES = ["OFFER_LETTER", "CONTRACT", "ID_PROOF", "ADDRESS_PROOF", "DEGREE", "PAYSLIP", "OTHER"];
+const DOC_TYPES = ["OFFER_LETTER", "ID_PROOF", "CERTIFICATE", "CONTRACT", "NDA", "PAYSLIP", "OTHER"] as const;
+
+const DOC_TYPE_LABELS: Record<string, string> = {
+  OFFER_LETTER: "Offer Letter",
+  ID_PROOF: "ID Proof",
+  CERTIFICATE: "Certificate",
+  CONTRACT: "Contract",
+  NDA: "NDA",
+  PAYSLIP: "Payslip",
+  OTHER: "Other",
+};
 
 export default function DocumentsTab({ employeeId }: { employeeId: string }) {
   const [typeFilter, setTypeFilter] = React.useState("all");
@@ -173,7 +183,7 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
           <SelectContent>
             <SelectItem value="all">All Types</SelectItem>
             {DOC_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>{t}</SelectItem>
+              <SelectItem key={t} value={t}>{DOC_TYPE_LABELS[t] ?? t}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -197,7 +207,7 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
                   </SelectTrigger>
                   <SelectContent>
                     {DOC_TYPES.map((t) => (
-                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                      <SelectItem key={t} value={t}>{DOC_TYPE_LABELS[t] ?? t}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -271,7 +281,7 @@ export default function DocumentsTab({ employeeId }: { employeeId: string }) {
                         <p className="text-xs text-slate-600">
                           <span className="font-semibold text-indigo-600 hover:underline">Click to upload</span> or drag and drop
                         </p>
-                        <p className="text-[9px] text-slate-400">PDF, PNG, JPG, DOC or DOCX (max 50MB)</p>
+                        <p className="text-[9px] text-slate-400">PDF, PNG, JPG, SVG, DOC, DOCX, XLSX, CSV (max 50MB)</p>
                       </div>
                     )}
                   </div>
