@@ -56,6 +56,7 @@ export interface EmployeeProfile {
   status: "Active" | "Inactive" | "On Leave" | "Suspended" | "Terminated" | string;
   employmentType?: "full_time" | "part_time" | "contract" | "intern" | string;
   dateOfJoining?: string;
+  joiningDate?: string;
   dateOfBirth?: string;
   gender?: string;
   bloodGroup?: string;
@@ -74,6 +75,7 @@ export interface EmployeeProfile {
   terminationDetails?: TerminationDetails | null;
   suspensionDetails?: SuspensionDetails | null;
   suspensionHistory?: any[];
+  exitDate?: string;
   createdAt: string;
   updatedAt: string;
   companyId: string;

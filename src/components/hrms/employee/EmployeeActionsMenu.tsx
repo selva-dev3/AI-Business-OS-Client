@@ -38,6 +38,7 @@ import {
 import { SuspendEmployeeModal } from "@/components/hrms/employee/SuspendEmployeeModal";
 import { TerminateEmployeeModal } from "@/components/hrms/employee/TerminateEmployeeModal";
 import { OnLeaveModal } from "@/components/hrms/employee/OnLeaveModal";
+import { EditEmployeeModal } from "./EditEmployeeModal";
 
 export function EmployeeActionsMenu({
   employee,
@@ -62,6 +63,7 @@ export function EmployeeActionsMenu({
   const [suspendOpen, setSuspendOpen] = React.useState(false);
   const [terminateOpen, setTerminateOpen] = React.useState(false);
   const [onLeaveOpen, setOnLeaveOpen] = React.useState(false);
+  const [editOpen, setEditOpen] = React.useState(false);
 
   const status = employee.status?.toLowerCase() || "";
 
@@ -122,7 +124,7 @@ export function EmployeeActionsMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-52 bg-white border border-slate-200 shadow-md">
-          <DropdownMenuItem onClick={() => router.push(`/hrms/employees?edit=${employee.id}`)}>
+          <DropdownMenuItem onClick={() => setEditOpen(true)}>
             <Edit className="mr-2 h-4 w-4 text-slate-400" />
             Edit Profile
           </DropdownMenuItem>
@@ -247,6 +249,13 @@ export function EmployeeActionsMenu({
           }
         }}
         isPending={terminateMutation.isPending}
+      />
+
+      <EditEmployeeModal
+        employee={employee}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        onSuccess={onUpdate}
       />
     </>
   );

@@ -38,6 +38,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -76,6 +77,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 export default function EmployeesPage() {
+  const router = useRouter();
   // Filters state
   const [searchQuery, setSearchQuery] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState<string>("");
@@ -710,6 +712,7 @@ export default function EmployeesPage() {
       cell: (emp) => (
         <Link
           href={`/hrms/employees/${emp.id}`}
+          onClick={(e) => e.stopPropagation()}
           className="flex items-center gap-3 group/link hover:text-indigo-600 transition-colors"
         >
           <Avatar size="lg" className="h-9 w-9 rounded-full bg-indigo-50 border border-slate-200 group-hover/link:border-indigo-400 transition-colors">
@@ -771,6 +774,7 @@ export default function EmployeesPage() {
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-slate-400 hover:text-slate-600 rounded-md focus-visible:ring-0 focus-visible:ring-offset-0"
+              onClick={(e) => e.stopPropagation()}
             >
               <MoreVertical className="h-4 w-4" />
             </Button>
@@ -981,6 +985,7 @@ export default function EmployeesPage() {
                 columns={columns}
                 isLoading={isLoading}
                 emptyMessage="No employees matching search criteria"
+                onRowClick={(emp) => router.push(`/hrms/employees/${emp.id}`)}
               />
             </CardContent>
           </Card>
