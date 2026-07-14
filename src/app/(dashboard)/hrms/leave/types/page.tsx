@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Plus, Search, Pencil, Trash2, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -45,6 +46,7 @@ const initialFormData: LeaveTypeFormData = {
 };
 
 export default function LeaveTypesPage() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = React.useState("");
   const [isCreateOpen, setIsCreateOpen] = React.useState(false);
   const [isEditOpen, setIsEditOpen] = React.useState(false);
@@ -279,6 +281,7 @@ export default function LeaveTypesPage() {
             columns={columns}
             isLoading={isLoading}
             emptyMessage="No leave types found. Click 'Create Leave Type' to add one."
+            onRowClick={(row) => router.push(`/hrms/leave/types/${row._id}`)}
           />
         </CardContent>
       </Card>

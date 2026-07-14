@@ -164,6 +164,14 @@ export function useHolidays(params?: { year?: string; type?: string }) {
   });
 }
 
+export function useHoliday(id: string) {
+  return useQuery({
+    queryKey: leaveKeys.holiday(id),
+    queryFn: () => leaveApi.getHoliday(id),
+    enabled: !!id,
+  });
+}
+
 export function useCreateHoliday() {
   const qc = useQueryClient();
   return useMutation({
@@ -179,8 +187,9 @@ export function useUpdateHoliday() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateHolidayData }) =>
       leaveApi.updateHoliday(id, data),
-    onSuccess: () => {
+    onSuccess: (_, { id }) => {
       qc.invalidateQueries({ queryKey: leaveKeys.all });
+      qc.invalidateQueries({ queryKey: leaveKeys.holiday(id) });
     },
   });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   Calendar,
   CheckCircle,
@@ -71,6 +72,7 @@ import { DataTable, Column } from "@/components/shared/datatable";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 
 export default function LeavePage() {
+  const router = useRouter();
   const [topTab, setTopTab] = React.useState<"requests" | "types" | "holidays">("requests");
   const [activeTab, setActiveTab] = React.useState<"my-requests" | "team-approvals" | "outages">("my-requests");
   
@@ -1259,6 +1261,7 @@ export default function LeavePage() {
               columns={leaveTypeColumns}
               isLoading={isLoadingLeaveTypes}
               emptyMessage="No leave types found. Create one using the button above."
+              onRowClick={(row) => router.push(`/hrms/leave/types/${row._id}`)}
             />
           </CardContent>
         </Card>

@@ -164,6 +164,9 @@ export const leaveApi = {
   getHolidays: (params?: { year?: string; type?: string }) =>
     apiGet<Holiday[]>(`${BASE_HOLIDAYS}${buildQueryString(params ?? {})}`),
 
+  getHoliday: (id: string) =>
+    apiGet<Holiday>(`${BASE_HOLIDAYS}/${id}`),
+
   createHoliday: (data: CreateHolidayData) =>
     apiPost<Holiday>(BASE_HOLIDAYS, data),
 
