@@ -167,29 +167,75 @@ export default function LeaveTab({ employeeId }: { employeeId: string }) {
           <p className="text-sm font-medium">No leave requests found</p>
         </div>
       ) : (
-        <div className="rounded-lg border bg-white">
-          <Table>
+        <div className="rounded-lg border bg-white overflow-x-auto">
+          <Table className="min-w-[900px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Leave Type</TableHead>
                 <TableHead>From</TableHead>
                 <TableHead>To</TableHead>
-                <TableHead>Days</TableHead>
+                <TableHead className="text-center">Days</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Reason</TableHead>
+                <TableHead>Approved By</TableHead>
+                <TableHead>Approved At</TableHead>
+                <TableHead>Created At</TableHead>
+                <TableHead>Updated At</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.map((req) => (
-                <TableRow key={req.id}>
-                  <TableCell className="font-medium text-xs">{req.leaveType}</TableCell>
-                  <TableCell className="text-xs">{new Date(req.fromDate).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-xs">{new Date(req.toDate).toLocaleDateString()}</TableCell>
-                  <TableCell className="text-xs font-semibold">{req.days}</TableCell>
-                  <TableCell><LeaveStatusBadge status={req.status} /></TableCell>
-                  <TableCell className="text-xs text-slate-500 max-w-[200px] truncate">{req.reason}</TableCell>
-                </TableRow>
-              ))}
+              {requests.map((req) => {
+                const leaveTypeName = typeof req.leaveTypeId === "object" && req.leaveTypeId
+                  ? `${req.leaveTypeId.name} (${req.leaveTypeId.code})`
+                  : (req.leaveType || "N/A");
+
+                const approvedByName = typeof req.approvedBy === "object" && req.approvedBy
+                  ? `${req.approvedBy.firstName} ${req.approvedBy.lastName}`
+                  : (typeof req.approvedBy === "string" ? req.approvedBy : "—");
+
+                const formatDate = (dateStr?: string) => {
+                  if (!dateStr) return "—";
+                  try {
+                    return new Date(dateStr).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    });
+                  } catch (_) {
+                    return dateStr;
+                  }
+                };
+
+                const formatDateTime = (dateStr?: string) => {
+                  if (!dateStr) return "—";
+                  try {
+                    return new Date(dateStr).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    });
+                  } catch (_) {
+                    return dateStr;
+                  }
+                };
+
+                return (
+                  <TableRow key={req.id || req._id}>
+                    <TableCell className="font-medium text-xs text-slate-800">{leaveTypeName}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{formatDate(req.fromDate)}</TableCell>
+                    <TableCell className="text-xs text-slate-600">{formatDate(req.toDate)}</TableCell>
+                    <TableCell className="text-xs font-semibold text-slate-700 text-center">{req.days}</TableCell>
+                    <TableCell><LeaveStatusBadge status={req.status} /></TableCell>
+                    <TableCell className="text-xs text-slate-500 max-w-[150px] truncate" title={req.reason}>{req.reason}</TableCell>
+                    <TableCell className="text-xs text-slate-600 font-medium">{approvedByName}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{formatDateTime(req.approvedAt)}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{formatDateTime(req.createdAt)}</TableCell>
+                    <TableCell className="text-xs text-slate-500">{formatDateTime(req.updatedAt)}</TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

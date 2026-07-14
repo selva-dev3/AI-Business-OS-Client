@@ -110,16 +110,20 @@ export interface AttendanceResponse {
 // ─── LEAVE ───────────────────────────────────────────────────────────────────
 
 export interface LeaveRequestItem {
-  id: string;
+  id?: string;
+  _id?: string;
   leaveType: string;
-  leaveTypeId?: string;
+  leaveTypeId?: { _id: string; name: string; code: string } | string;
   fromDate: string;
   toDate: string;
   days: number;
   status: "pending" | "approved" | "rejected" | "cancelled" | string;
   reason: string;
-  approvedBy?: { firstName: string; lastName: string } | string;
-  rejectedBy?: { firstName: string; lastName: string } | string;
+  approvedBy?: { _id?: string; firstName: string; lastName: string; email?: string } | string;
+  rejectedBy?: { _id?: string; firstName: string; lastName: string; email?: string } | string;
+  approvedAt?: string;
+  createdAt?: string;
+  updatedAt?: string;
   rejectionReason?: string;
   comments?: string;
 }
